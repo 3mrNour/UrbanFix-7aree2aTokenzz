@@ -3,19 +3,12 @@ import Report from "../models/report.model.js";
 export const createReport = async (req, res, next) => {
   try {
     const { category, description, urgency, location, addressDescription, photoBefore } = req.body;
-    const districtId = req.user?.districtId;
+    const districtId = req.user?.districtId || null;
 
     if (!category || !description || !photoBefore || !location?.coordinates) {
       return res.status(400).json({
         success: false,
         message: "category, description, photoBefore, and location.coordinates are required",
-      });
-    }
-
-    if (!districtId) {
-      return res.status(400).json({
-        success: false,
-        message: "Citizen account must be assigned to a district before creating reports",
       });
     }
 

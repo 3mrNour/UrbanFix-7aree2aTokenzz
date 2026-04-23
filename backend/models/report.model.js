@@ -3,7 +3,7 @@ import { ReportStatus, IssueCategories, UrgencyLevels } from "../utils/enums.js"
 
 const reportSchema = new mongoose.Schema({
     citizen: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    districtId: { type: mongoose.Schema.Types.ObjectId, ref: "District", required: true },
+    districtId: { type: mongoose.Schema.Types.ObjectId, ref: "District", default: null },
     category: { type: String, enum: IssueCategories, required: true },
     description: { type: String, required: true, trim: true },
     urgency: { type: String, enum: UrgencyLevels, default: "Medium" },
