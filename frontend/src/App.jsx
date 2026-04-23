@@ -1,10 +1,8 @@
-import Login from "./features/auth/Login"; // كمثال عشان تتأكد إنه شغال
+import Login from "./features/auth/Login";
 
 function App() {
   return (
-    <div>
-      <Login />
-    </div>
+    <Login />
   );
 }
 
