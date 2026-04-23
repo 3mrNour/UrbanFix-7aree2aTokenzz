@@ -11,7 +11,15 @@ import {
   FileText, 
   LayoutList, 
   MapPinOff,
-  Image as ImageIcon
+  Image as ImageIcon,
+  TrafficCone,
+  Lightbulb,
+  Trash2,
+  Droplets,
+  Wrench,
+  ShieldCheck,
+  Siren,
+  AlertTriangle
 } from "lucide-react";
 
 const reportSchema = z.object({
@@ -21,7 +29,7 @@ const reportSchema = z.object({
   photoBefore: z
     .any()
     .refine((f) => f?.length === 1, "Photo is required"),
-  addressDescription: z.string().optional(),
+  addressDescription: z.string().min(3, "Address / landmark is required"),
 });
 
 const getUrgencyStyles = (urgency) => {
@@ -36,6 +44,41 @@ const getUrgencyStyles = (urgency) => {
       return "bg-slate-50 text-slate-700 border-slate-200";
   }
 };
+
+const CATEGORY_OPTIONS = [
+  { value: "Roads", label: "Roads", icon: TrafficCone },
+  { value: "Electricity", label: "Electricity", icon: Lightbulb },
+  { value: "Sanitation", label: "Sanitation", icon: Trash2 },
+  { value: "Pothole", label: "Pothole", icon: TrafficCone },
+  { value: "Streetlight", label: "Streetlight", icon: Lightbulb },
+  { value: "Leak", label: "Leak", icon: Droplets },
+  { value: "Trash", label: "Trash", icon: Trash2 },
+  { value: "Sewage", label: "Sewage", icon: Wrench },
+];
+
+const URGENCY_OPTIONS = [
+  {
+    value: "Low",
+    label: "Low",
+    icon: ShieldCheck,
+    selectedClass: "border-emerald-400 bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700",
+    idleClass: "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/40",
+  },
+  {
+    value: "Medium",
+    label: "Medium",
+    icon: AlertTriangle,
+    selectedClass: "border-amber-400 bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700",
+    idleClass: "border-slate-200 bg-white text-slate-600 hover:border-amber-200 hover:bg-amber-50/40",
+  },
+  {
+    value: "High",
+    label: "High",
+    icon: Siren,
+    selectedClass: "border-rose-400 bg-gradient-to-r from-rose-50 to-red-50 text-rose-700",
+    idleClass: "border-slate-200 bg-white text-slate-600 hover:border-rose-200 hover:bg-rose-50/40",
+  },
+];
 
 const STATUS_OPTIONS = [
   "ALL",
@@ -65,6 +108,8 @@ const CitizenDashboard = () => {
     handleSubmit,
     formState: { errors },
     reset,
+    setValue,
+    watch,
   } = useForm({
     resolver: zodResolver(reportSchema),
     defaultValues: {
@@ -82,6 +127,9 @@ const CitizenDashboard = () => {
       return {};
     }
   }, []);
+
+  const selectedCategory = watch("category");
+  const selectedUrgency = watch("urgency");
 
   const filteredReports = useMemo(() => {
     if (statusFilter === "ALL") return reports;
@@ -196,19 +244,34 @@ const CitizenDashboard = () => {
               {/* Category */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
-                <select
-                  {...register("category")}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
-                >
-                  <option value="Roads">Roads</option>
-                  <option value="Electricity">Electricity</option>
-                  <option value="Sanitation">Sanitation</option>
-                  <option value="Pothole">Pothole</option>
-                  <option value="Streetlight">Streetlight</option>
-                  <option value="Leak">Leak</option>
-                  <option value="Trash">Trash</option>
-                  <option value="Sewage">Sewage</option>
-                </select>
+                <input type="hidden" {...register("category")} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {CATEGORY_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const isSelected = selectedCategory === option.value;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setValue("category", option.value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        }
+                        className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition-all flex items-center gap-2 ${
+                          isSelected
+                            ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/40"
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 {errors.category && (
                   <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
                     <AlertCircle className="w-3 h-3" /> {errors.category.message}
@@ -235,14 +298,31 @@ const CitizenDashboard = () => {
               {/* Urgency */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Urgency</label>
-                <select
-                  {...register("urgency")}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
-                >
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                  <option value="High">High</option>
-                </select>
+                <input type="hidden" {...register("urgency")} />
+                <div className="grid grid-cols-3 gap-2">
+                  {URGENCY_OPTIONS.map((option) => {
+                    const Icon = option.icon;
+                    const isSelected = selectedUrgency === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setValue("urgency", option.value, {
+                            shouldValidate: true,
+                            shouldDirty: true,
+                          })
+                        }
+                        className={`rounded-xl border px-3 py-2.5 text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                          isSelected ? option.selectedClass : option.idleClass
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Address */}
@@ -256,6 +336,11 @@ const CitizenDashboard = () => {
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
                   />
                 </div>
+                {errors.addressDescription && (
+                  <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {errors.addressDescription.message}
+                  </p>
+                )}
               </div>
 
               {/* Photo Upload */}

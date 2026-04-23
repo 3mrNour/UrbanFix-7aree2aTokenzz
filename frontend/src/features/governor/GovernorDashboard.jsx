@@ -22,6 +22,12 @@ const getPlotColor = (item) => {
   return "#84cc16";
 };
 
+const getPlotRadius = (item) => {
+  if (item?.urgency === "High") return 11;
+  if (item?.urgency === "Medium") return 9;
+  return 7;
+};
+
 const RecenterMap = ({ center }) => {
   const map = useMap();
 
@@ -128,6 +134,11 @@ const GovernorDashboard = () => {
 
   const closeReportDetails = () => {
     setSelectedReportDetails(null);
+  };
+
+  const openDetailsFromHeatmap = (heatmapItem) => {
+    const matchedReport = reports.find((report) => String(report._id) === String(heatmapItem._id));
+    setSelectedReportDetails(matchedReport || heatmapItem);
   };
 
   return (
@@ -416,7 +427,7 @@ const GovernorDashboard = () => {
           )}
 
           {selectedReportDetails && (
-            <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[3000] bg-black/45 backdrop-blur-[1px] flex items-center justify-center p-4">
               <div className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white rounded-2xl border border-slate-200 shadow-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-slate-900">Problem Full Details</h3>
@@ -585,11 +596,13 @@ const GovernorDashboard = () => {
                       <CircleMarker
                         key={item._id}
                         center={[item.location.coordinates[1], item.location.coordinates[0]]}
-                        radius={8}
+                        radius={getPlotRadius(item)}
                         pathOptions={{
                           color: getPlotColor(item),
                           fillColor: getPlotColor(item),
-                          fillOpacity: 0.75,
+                          fillOpacity: 0.82,
+                          weight: 2,
+                          opacity: 1,
                         }}
                       >
                         <Popup>
@@ -613,6 +626,13 @@ const GovernorDashboard = () => {
                                 />
                               </a>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => openDetailsFromHeatmap(item)}
+                              className="mt-2 w-full rounded-md bg-slate-900 text-white text-[11px] font-bold px-2 py-1.5 hover:bg-black"
+                            >
+                              View Full Details
+                            </button>
                           </div>
                         </Popup>
                       </CircleMarker>
