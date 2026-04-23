@@ -41,6 +41,22 @@ const userSchema = new mongoose.Schema(
       required: true,
       default: UserRoles.CITIZEN,
     },
+    districtId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "District",
+      default: null,
+    },
+    currentLocation: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number],
+        default: undefined,
+      },
+    },
     isActive: {
       type: Boolean,
       default: false,
@@ -52,6 +68,8 @@ const userSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+userSchema.index({ currentLocation: "2dsphere" });
 
 userSchema.pre("save", async function hashPassword() {
   if (!this.isModified("password")) return;

@@ -7,6 +7,8 @@ import { fileURLToPath } from "url";
 import userRoutes from "./routes/userRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
+import governorRoutes from "./routes/governorRoutes.js";
+import districtManagerRoutes from "./routes/districtManagerRoutes.js";
 import { ensureDefaultAdmin } from "./utils/seedAdmin.js";
 
 dotenv.config();
@@ -24,6 +26,8 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/users", userRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/tasks", taskRoutes);
+app.use("/api/governor", governorRoutes);
+app.use("/api/manager", districtManagerRoutes);
 
 
 app.get("/health", (_req, res) => {

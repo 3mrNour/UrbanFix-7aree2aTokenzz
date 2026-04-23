@@ -111,6 +111,24 @@
               ]
             }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "const token = res.token || res.accessToken;",
+                  "if (token) {",
+                  "  pm.environment.set(\"token\", token);",
+                  "}",
+                  "if (res?.data?.id) {",
+                  "  pm.environment.set(\"userId\", res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "response": []
         },
         {
@@ -139,6 +157,24 @@
               ]
             }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "const token = res.token || res.accessToken;",
+                  "if (token) {",
+                  "  pm.environment.set(\"token\", token);",
+                  "}",
+                  "if (res?.data?.id) {",
+                  "  pm.environment.set(\"userId\", res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "response": []
         },
         {
@@ -168,6 +204,24 @@
               ]
             }
           },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "const token = res.token || res.accessToken;",
+                  "if (token) {",
+                  "  pm.environment.set(\"token\", token);",
+                  "}",
+                  "if (res?.data?.id) {",
+                  "  pm.environment.set(\"userId\", res.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
           "response": []
         },
         {

@@ -25,7 +25,7 @@ router.post(
 router.get(
   "/",
   protect,
-  restrictTo("MANAGER", "GOVERNOR"),
+  restrictTo("GOVERNOR"),
   getAllUsers
 );
 
@@ -38,7 +38,7 @@ router.get(
 router.patch(
   "/:id",
   protect,
-  restrictTo("MANAGER", "GOVERNOR"),
+  restrictTo("GOVERNOR"),
   updateUserValidator,
   updateUser
 );
