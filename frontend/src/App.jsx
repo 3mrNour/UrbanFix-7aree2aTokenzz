@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Login from "./features/auth/Login";
 import CitizenDashboard from "./features/citizen/CitizenDashboard";
 import GovernorDashboard from "./features/governor/GovernorDashboard";
+import TechnicianDashboard from "./features/technician/TechnicianDashboard";
+import DispatcherDashboard from "./features/dispatcher/DispatcherDashboard";
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const token = localStorage.getItem("token");
@@ -34,11 +36,27 @@ function App() {
 
         <Route
           path="/technician/dashboard"
-          element={<ProtectedRoute allowedRoles={["TECHNICIAN"]}><div className="p-6">Technician dashboard coming next.</div></ProtectedRoute>}
+          element={
+            <ProtectedRoute allowedRoles={["TECHNICIAN"]}>
+              <TechnicianDashboard />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/manager/dashboard"
-          element={<ProtectedRoute allowedRoles={["MANAGER"]}><div className="p-6">Manager dashboard coming next.</div></ProtectedRoute>}
+          element={
+            <ProtectedRoute allowedRoles={["MANAGER"]}>
+              <DispatcherDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dispatcher/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["MANAGER"]}>
+              <DispatcherDashboard />
+            </ProtectedRoute>
+          }
         />
         <Route
           path="/governor/dashboard"

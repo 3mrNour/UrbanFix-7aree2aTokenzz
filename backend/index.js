@@ -8,7 +8,7 @@ import userRoutes from "./routes/userRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import taskRoutes from "./routes/taskRoutes.js";
 import governorRoutes from "./routes/governorRoutes.js";
-import districtManagerRoutes from "./routes/districtManagerRoutes.js";
+import managerRoutes from "./routes/managerRoutes.js";
 import { ensureDefaultAdmin } from "./utils/seedAdmin.js";
 
 dotenv.config();
@@ -27,7 +27,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/governor", governorRoutes);
-app.use("/api/manager", districtManagerRoutes);
+app.use("/api/manager", managerRoutes);
 
 
 app.get("/health", (_req, res) => {
