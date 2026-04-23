@@ -1,393 +1,252 @@
-# Urban Fix Backend - Full Progress Report
+# Urban Fix Backend - Complete Progress Report
 
-هذا التقرير يوثّق الحالة الحالية الفعلية لكل ملفات `backend` وما تم تنفيذه حتى الآن.
+هذا الملف يوثق كل ما تم بناؤه فعليًا داخل `backend` حتى الآن بناءً على قراءة الملفات الحالية.
 
-## 1) Current Backend Architecture
+## 1) Architecture Overview
 
-### Entry Point: `index.js`
-- المشروع يعمل بـ `ES Modules`.
-- Middlewares مفعلة:
-  - `cors()`
-  - `express.json({ limit: "1mb" })`
-  - `express.urlencoded({ extended: true })`
-- Static serving:
-  - `app.use("/uploads", express.static(...))`
-- Database bootstrap:
-  - `connectDB()` باستخدام `mongoose.connect(process.env.MONGO_URL)`
-  - فشل الاتصال يؤدي إلى `process.exit(1)`
-- Routes mounted:
-  - `/api/users`
-  - `/api/reports`
-  - `/api/tasks`
-- Diagnostics:
-  - `GET /health`
-  - 404 handler
+- المشروع يعمل بـ `ES Modules` (`"type": "module"`).
+- السيرفر الأساسي في `index.js`.
+- قاعدة البيانات: MongoDB عبر `mongoose`.
+- Middleware الأساسية:
+  - `cors`
+  - `express.json`
+  - `express.urlencoded`
+- Static uploads serving:
+  - `/uploads`
+- Error handling:
+  - 404 route handler
   - global error middleware
+- startup flow:
+  1. `connectDB()`
+  2. `ensureDefaultAdmin()`
+  3. `app.listen(...)`
 
-## 2) Data Models
+## 2) Current Folder Modules
 
-### `models/User.js`
-- Single user schema (ليس discriminators حاليًا).
+### `models`
+
+#### `models/User.js`
+- Single user schema (بدون discriminators حاليًا).
 - الحقول:
   - `fullName` (required)
   - `nationalId` (unique + sparse)
   - `employeeId` (unique + sparse)
   - `password` (required, `select: false`)
   - `phoneNumber` (required, unique)
-  - `role` (`CITIZEN | TECHNICIAN | MANAGER | GOVERNOR`)
-  - `isActive` (default: `false`)
-  - `deletedAt` (default: `null`)
-- Middleware:
-  - pre-save hashing بكلفة 12 rounds عبر `bcrypt`
-- Method:
-  - `comparePassword(plainText)`
+  - `role` (`CITIZEN`, `TECHNICIAN`, `MANAGER`, `GOVERNOR`)
+  - `isActive` (default = `false`)
+  - `deletedAt`
+- Pre-save hook لتشفير كلمة المرور بـ `bcrypt` (12 rounds).
+- Instance method: `comparePassword()`.
 
-### `models/report.model.js`
-- الربط بالمواطن عبر reference فقط (بدون تكرار بيانات):
-  - `citizen: ObjectId -> User (required)`
-- حقول البلاغ الأساسية:
+#### `models/report.model.js`
+- Report schema مرتبط بالمستخدم عبر references:
+  - `citizen` (required ObjectId -> `User`)
+  - `assignedTechnician` (optional ObjectId -> `User`)
+  - `districtManager` (optional ObjectId -> `User`)
+- حقول التشغيل:
   - `category`, `description`, `urgency`
   - `photoBefore` (required)
   - `photoAfter` (proof of work)
-  - `status` من `ReportStatus`
-  - `assignedTechnician`, `districtManager`
-  - `rejectionReason`
-- GeoJSON location:
-  - `type: "Point"`
-  - `coordinates: [longitude, latitude]`
-  - validator لطول الإحداثيات = 2
-- Index:
-  - `2dsphere` على `location`
+  - `status`
+- GeoJSON support:
+  - `location.type = "Point"`
+  - `location.coordinates = [lng, lat]` مع validation
+  - `2dsphere` index على `location`
 
-## 3) Security and Authentication Layer
+## 3) Security & Auth
 
 ### `utils/generateToken.js`
-- إنشاء JWT بالـ payload:
-  - `{ id: userId }`
-- يعتمد على:
-  - `JWT_SECRET`
-  - `JWT_EXPIRES_IN` (default: `7d`)
+- JWT generation using:
+  - payload: `{ id: userId }`
+  - secret: `JWT_SECRET`
+  - expiry: `JWT_EXPIRES_IN` أو `7d`
 
 ### `middleware/authMiddleware.js`
 - `protect`:
-  - يقرأ Bearer token
-  - يتحقق من JWT
-  - يجلب المستخدم ويضيفه إلى `req.user`
-  - يرفض الحساب غير النشط
-- `restrictTo(...allowedRoles)`:
+  - يتحقق من Bearer token
+  - يفك JWT
+  - يجلب المستخدم من DB
+  - يرفض المستخدم غير النشط
+  - يضع المستخدم في `req.user`
+- `restrictTo(...roles)`:
   - role-based authorization
 
-## 4) Controllers Status
+## 4) Admin Bootstrapping (No Temporary Manual Setup)
+
+### `utils/seedAdmin.js`
+- عند startup يتم التأكد من وجود admin افتراضي.
+- لو admin غير موجود يتم إنشاؤه تلقائيًا.
+- لو موجود وغير active يتم تفعيله.
+- الإعدادات تُقرأ من `.env` (مع defaults):
+  - `ADMIN_FULL_NAME`
+  - `ADMIN_EMPLOYEE_ID` (default `ADMIN-0001`)
+  - `ADMIN_PHONE_NUMBER`
+  - `ADMIN_PASSWORD` (default `Admin@12345`)
+  - `ADMIN_ROLE` (`GOVERNOR` أو `MANAGER`)
+
+## 5) Controllers
 
 ### `controllers/userController.js`
 - `createUser`
-- `login` (بالـ `nationalId` أو `employeeId` + password)
 - `getUserProfile`
 - `getAllUsers` (filter + pagination)
-- `updateUser`
-- `deleteUser` (soft toggle)
-- Error handling:
-  - 422 validation
-  - 409 duplicate unique field
+- `updateUser` (يدعم `isActive` للتفعيل/التعطيل)
+- `deleteUser` (soft toggle عبر `isActive` + `deletedAt`)
+- `login`
+  - citizen/staff login by `nationalId` or `employeeId`
+  - يرجع:
+    - `token`
+    - `accessToken`
+    - `data`
+- `loginAdmin`
+  - admin-only login by `employeeId`
+  - role لازم يكون `MANAGER` أو `GOVERNOR`
+  - يرجع:
+    - `token`
+    - `accessToken`
+    - `data`
 
-### `controllers/reportController.js` (Citizen Module)
+### `controllers/reportController.js` (Citizen)
 - `createReport`
-  - يربط البلاغ بالمستخدم الحالي: `citizen: req.user.id`
+  - ينشئ بلاغ مربوط بـ `req.user.id` كمواطن
 - `getMyReports`
-  - يجلب بلاغات المواطن الحالي فقط
+  - يرجع بلاغات المواطن الحالي فقط
 
-### `controllers/taskController.js` (Technician Module)
+### `controllers/taskController.js` (Technician)
 - `getAssignedTasks`
-  - يجلب البلاغات المعيّنة للفني الحالي
-  - populate لبيانات المواطن (`fullName`, `phoneNumber`)
 - `getTaskDetails`
-  - يجلب تفاصيل مهمة واحدة إذا كانت مخصصة لنفس الفني
 - `updateTaskStatus`
-  - يسمح فقط: `IN_PROGRESS`, `RESOLVED`
-  - **Closure Validation مطبقة**:
-    - عند التحويل إلى `RESOLVED` يجب رفع ملف `photoAfter`
-    - بدون الملف -> `400 Bad Request`
+  - status المسموح: `IN_PROGRESS`, `RESOLVED`
+  - **Closure Validation مطبق**:
+    - لو `RESOLVED` لازم `photoAfter` file
+    - بدون ملف => `400`
 
-## 5) Routes Status
+### `controllers/governorController.js` (City Governor)
+- `getGlobalReports`
+  - كل البلاغات + filters:
+    - `status`, `category`, `urgency`, `fromDate`, `toDate`
+  - populate للمواطن والفني
+- `getSystemAnalytics` (Aggregation)
+  - إجمالي البلاغات آخر 24 ساعة
+  - counts by status (`PENDING`, `IN_PROGRESS`, `RESOLVED`)
+  - top categories
+  - average resolution time للبلاغات المحلولة
+- `getHeatmapMapData`
+  - يرجع بيانات map فقط:
+    - `location`, `status`, `urgency`, `category`, `createdAt`
+
+## 6) Routes
 
 ### `routes/userRoutes.js`
-- `POST /api/users/login` (public)
-- `POST /api/users` (public create)
-- `GET /api/users` (MANAGER/GOVERNOR)
-- `GET /api/users/profile` (authenticated)
-- `PATCH /api/users/:id` (MANAGER/GOVERNOR)
-- `DELETE /api/users/:id` (GOVERNOR)
+- Public:
+  - `POST /api/users`
+  - `POST /api/users/login`
+  - `POST /api/users/admin/login`
+- Protected:
+  - `GET /api/users/profile` (any authenticated)
+  - `GET /api/users` (`GOVERNOR`)
+  - `PATCH /api/users/:id` (`GOVERNOR`)
+  - `DELETE /api/users/:id` (`GOVERNOR`)
 
-### `routes/reportRoutes.js`
-- `POST /api/reports` (CITIZEN)
-- `GET /api/reports/my-reports` (CITIZEN)
+### `routes/reportRoutes.js` (Citizen)
+- `POST /api/reports` (`CITIZEN`)
+- `GET /api/reports/my-reports` (`CITIZEN`)
 
-### `routes/taskRoutes.js`
-- `GET /api/tasks` (TECHNICIAN)
-- `GET /api/tasks/:id` (TECHNICIAN)
-- `PATCH /api/tasks/:id/status` (TECHNICIAN + Multer upload `photoAfter`)
+### `routes/taskRoutes.js` (Technician)
+- `GET /api/tasks` (`TECHNICIAN`)
+- `GET /api/tasks/:id` (`TECHNICIAN`)
+- `PATCH /api/tasks/:id/status` (`TECHNICIAN`)
+  - upload via Multer (`photoAfter`)
 
-## 6) Validators and Enums
+### `routes/governorRoutes.js` (Governor)
+- `GET /api/governor/reports` (`GOVERNOR`)
+- `GET /api/governor/analytics` (`GOVERNOR`)
+- `GET /api/governor/heatmap` (`GOVERNOR`)
+
+## 7) Mounted API in `index.js`
+
+- `/api/users`
+- `/api/reports`
+- `/api/tasks`
+- `/api/governor`
+- `/health`
+
+## 8) Validation Layer
 
 ### `validators/userValidator.js`
-- Create validator:
-  - role-based validation:
+- Create validation:
+  - role-based:
     - CITIZEN requires `nationalId`
-    - staff requires `employeeId`
-- Update validator:
-  - MongoId check
+    - Staff requires `employeeId`
+- Update validation:
+  - Mongo ID check
   - field constraints
-  - يمنع تعديل `password` عبر update route
+  - منع تحديث `password` عبر update endpoint
 
-### `utils/enums.js`
-- `UserRoles`
-- `ReportStatus`
-- `IssueCategories`
-- `UrgencyLevels`
+## 9) Postman Collections Status
 
-## 7) Environment and Dependencies
+### `postman/UrbanFix-All-Endpoints.postman_collection.json` (Primary)
+- يحتوي endpoints لكل modules:
+  - System
+  - Users/Auth
+  - Citizen Reports
+  - Technician Tasks
+- Login requests (`Citizen`, `Technician`, `Admin`) فيها Scripts تحفظ تلقائيًا:
+  - `token` في environment
+  - `userId` عند توفره
+- collection تستخدم:
+  - `Authorization: Bearer {{token}}`
 
-### `.env`
-- يحتوي المتغيرات الأساسية:
-  - `MONGO_URL`
-  - `PORT`
-  - `JWT_SECRET`
-- ملاحظة أمنية: لا يتم عرض القيم الحساسة في هذا التقرير.
+### `postman/UrbanFix-User-Routes.postman_collection.json`
+- قديم ومحدود لمسارات user فقط.
+
+## 10) Environment & Dependencies
+
+### `.env` required keys
+- `MONGO_URL`
+- `PORT`
+- `JWT_SECRET`
+
+### optional admin seed keys
+- `ADMIN_FULL_NAME`
+- `ADMIN_EMPLOYEE_ID`
+- `ADMIN_PHONE_NUMBER`
+- `ADMIN_PASSWORD`
+- `ADMIN_ROLE`
 
 ### `package.json`
-- Dependencies:
+- runtime:
   - `express`, `mongoose`, `cors`, `dotenv`
   - `bcrypt`, `jsonwebtoken`
   - `multer`, `express-validator`
-- Dev:
+- dev:
   - `nodemon`
-- script:
-  - `npm run dev`
 
-## 8) What Happened So Far (Chronological Summary)
+## 11) Key Business Rules Implemented
 
-1. تجهيز Express entry point + Mongo connection + global error handling.
-2. بناء User module (model/controller/routes/validator).
-3. حل مشكلة ربط المسارات `/api/users`.
-4. التحويل الكامل إلى ES Modules.
-5. إضافة JWT auth (`generateToken`, `protect`, `restrictTo`) + `login`.
-6. بناء Citizen Reports flow (`createReport`, `getMyReports`) مع حماية role-based.
-7. بناء Technician Tasks flow:
-   - assigned tasks
-   - task details
-   - status update
-   - mandatory proof photo on closure (`RESOLVED`)
-8. توصيل كل modules في `index.js`:
-   - users + reports + tasks
+1. Access control by role:
+   - Citizen / Technician / Governor boundaries واضحة.
+2. Governor controls user management:
+   - list, update, activate/deactivate users.
+3. Technician closure validation:
+   - `RESOLVED` requires `photoAfter`.
+4. JWT token returned in sign-in responses:
+   - `token` + `accessToken`.
+5. Postman auto token storage:
+   - token saved automatically after login.
 
-## 9) Full API Endpoints (Current)
+## 12) Current Known Gaps (Next Engineering Steps)
 
-### System
-- `GET /health`
-
-### Users
-- `POST /api/users`
-- `POST /api/users/login`
-- `GET /api/users`
-- `GET /api/users/profile`
-- `PATCH /api/users/:id`
-- `DELETE /api/users/:id`
-
-### Reports (Citizen)
-- `POST /api/reports`
-- `GET /api/reports/my-reports`
-
-### Tasks (Technician)
-- `GET /api/tasks`
-- `GET /api/tasks/:id`
-- `PATCH /api/tasks/:id/status` (multipart/form-data for `photoAfter`)
-
-## 10) Current Gaps / Recommended Next Steps
-
-1. إضافة validators خاصة بـ:
-   - `login`
-   - `createReport`
-   - `updateTaskStatus`
-2. إضافة file type / size restrictions على Multer (security hardening).
-3. توحيد naming/style بين الملفات.
-4. إضافة integration tests لمسارات auth/reports/tasks.
-5. تبني discriminators في User لاحقًا إذا مطلوب معماريًا.
+1. إضافة validators منفصلة لـ:
+   - login endpoints
+   - report creation
+   - task status updates
+2. فرض file size/type limits في Multer.
+3. إضافة centralized logger + structured error codes.
+4. إضافة integration tests لمسارات auth/reports/tasks/governor.
+5. إزالة/أرشفة الـ user-only old Postman collection لمنع اللبس.
 
 ---
 
-Last updated from real workspace files in `backend`.
-# Urban Fix Backend - Progress Report (Updated)
-
-هذا التقرير مبني على قراءة ملفات `backend` الموجودة فعليًا الآن.
-
-## 1) نظرة عامة على الحالة الحالية
-
-- المشروع يعمل بـ `ES Modules` (في `package.json`: `"type": "module"`).
-- Entry point في `index.js` ويشمل:
-  - `cors`, `express.json`, `express.urlencoded`
-  - static serving على `/uploads`
-  - MongoDB connection عبر `mongoose`
-  - global 404 + global error handler
-- الراوتات المربوطة حاليًا:
-  - `app.use("/api/users", userRoutes)`
-  - `app.use("/api/reports", reportRoutes)`
-
-## 2) الملفات الأساسية وما تحتويه
-
-### `models/User.js`
-
-- User schema واحد (غير مبني على discriminators حاليًا).
-- الحقول:
-  - `fullName`
-  - `nationalId` (unique + sparse)
-  - `employeeId` (unique + sparse)
-  - `password` (select: false)
-  - `phoneNumber` (unique)
-  - `role` من `UserRoles`
-  - `isActive` (default: `false`)
-  - `deletedAt`
-- pre-save hook لتشفير كلمة المرور بـ `bcrypt`.
-- method `comparePassword`.
-
-### `models/report.model.js`
-
-- نموذج البلاغ مرتبط بالمواطن بالـ reference:
-  - `citizen: { type: ObjectId, ref: "User", required: true }`
-- GeoJSON Point مدعوم في `location`:
-  - `type: "Point"`
-  - `coordinates: [longitude, latitude]` مع validator لطول المصفوفة = 2
-- الحقول الأساسية موجودة:
-  - `category`, `description`, `photoBefore`, `status`
-- `2dsphere` index موجود على `location`.
-
-### `controllers/userController.js`
-
-- دوال CRUD:
-  - `createUser`
-  - `getUserProfile`
-  - `getAllUsers` (filter + pagination)
-  - `updateUser`
-  - `deleteUser` (soft delete عبر `isActive` toggle)
-- دالة `login` مضافة:
-  - تسجيل الدخول بـ (`nationalId` أو `employeeId`) + `password`
-  - مقارنة الباسورد عبر `comparePassword`
-  - إنشاء JWT عبر `generateToken`
-  - منع دخول الحساب غير النشط
-
-### `controllers/reportController.js`
-
-- `createReport`:
-  - ينشئ بلاغ جديد
-  - يأخذ `citizen` من `req.user.id` (بدون تكرار بيانات المواطن)
-- `getMyReports`:
-  - يرجع بلاغات المستخدم الحالي فقط
-  - مع `populate` محدود لبيانات المواطن (`fullName`, `phoneNumber`, `role`)
-
-### `middleware/authMiddleware.js`
-
-- `protect`:
-  - يقرأ Bearer token
-  - يتحقق من JWT
-  - يجلب المستخدم ويضعه في `req.user`
-  - يرفض token ناقص/غير صالح أو مستخدم غير نشط
-- `restrictTo(...roles)`:
-  - يتحقق أن `req.user.role` ضمن الأدوار المسموح بها
-
-### `utils/generateToken.js`
-
-- ينشئ JWT بالـ payload:
-  - `{ id: userId }`
-- يعتمد على:
-  - `JWT_SECRET`
-  - `JWT_EXPIRES_IN` (اختياري، الافتراضي `7d`)
-
-### `routes/userRoutes.js`
-
-- `POST /api/users/login` (عام)
-- `POST /api/users` (create user)
-- `GET /api/users` (محمي + `MANAGER|GOVERNOR`)
-- `GET /api/users/profile` (محمي)
-- `PATCH /api/users/:id` (محمي + `MANAGER|GOVERNOR`)
-- `DELETE /api/users/:id` (محمي + `GOVERNOR`)
-
-### `routes/reportRoutes.js`
-
-- `POST /api/reports` (محمي + `CITIZEN`)
-- `GET /api/reports/my-reports` (محمي + `CITIZEN`)
-
-### `validators/userValidator.js`
-
-- `createUserValidator`:
-  - يتحقق من `fullName/password/phoneNumber/role`
-  - `nationalId` إلزامي للمواطن
-  - `employeeId` إلزامي للـ staff
-- `updateUserValidator`:
-  - يتحقق من `id` كـ MongoId
-  - يتحقق من الحقول المسموح بها
-  - يمنع تحديث `password` من endpoint التحديث
-
-### `utils/enums.js`
-
-- `UserRoles`: `CITIZEN`, `MANAGER`, `TECHNICIAN`, `GOVERNOR`
-- `ReportStatus`: `PENDING`, `IN_PROGRESS`, `RESOLVED`, `REJECTED`, `ARCHIVED`
-- `IssueCategories` و `UrgencyLevels`
-
-### `postman/UrbanFix-User-Routes.postman_collection.json`
-
-- موجودة وجاهزة لاختبار User APIs.
-- ملاحظة: هذه الـ collection ما زالت مركزة على user endpoints فقط، ولم يتم تحديثها بعد لتشمل report endpoints الجديدة.
-
-## 3) ما تم إنجازه زمنيًا (مختصر)
-
-1. بناء entry point وربط Mongo + middlewares + global error handling.
-2. إنشاء User module (model/controller/routes/validator).
-3. إضافة Postman collection لمسارات المستخدم.
-4. حل مشكلة `Route not found: /api/users` بربط الراوت في `index.js`.
-5. تفعيل ESM بشكل كامل لحل تعارض CommonJS/ESM.
-6. إضافة auth system:
-   - token generator
-   - `protect` + `restrictTo`
-   - `login` endpoint
-7. إنشاء Citizen report flow:
-   - `createReport`
-   - `getMyReports`
-   - report routes محمية ومربوطة في السيرفر.
-
-## 4) API Contract الحالي
-
-### System
-- `GET /health`
-
-### Users
-- `POST /api/users` إنشاء مستخدم
-- `POST /api/users/login` تسجيل دخول
-- `GET /api/users` قائمة المستخدمين (Manager/Governor)
-- `GET /api/users/profile` بروفايل المستخدم الحالي
-- `PATCH /api/users/:id` تحديث مستخدم
-- `DELETE /api/users/:id` تعطيل/إعادة تفعيل
-
-### Reports (Citizen Module)
-- `POST /api/reports` إنشاء بلاغ (CITIZEN فقط)
-- `GET /api/reports/my-reports` جلب بلاغات المواطن الحالي
-
-## 5) ملاحظات مهمة
-
-- لا يوجد تكرار لبيانات `fullName` داخل نموذج البلاغ؛ الربط يتم دائمًا عبر `citizen` reference إلى `User`.
-- `User.isActive` default حاليًا = `false`، لذا المستخدم الجديد لن يسجل دخول إلا بعد تفعيله.
-- يجب وجود `JWT_SECRET` داخل `.env` حتى تعمل المصادقة.
-- تم تجنب عرض القيم الحساسة في هذا التقرير.
-
-## 6) فجوات/تحسينات مقترحة
-
-1. إضافة validator خاص بتسجيل الدخول.
-2. إضافة validator خاص بإنشاء البلاغات (report validation middleware).
-3. تحديث Postman collection لتشمل:
-   - `POST /api/users/login`
-   - `POST /api/reports`
-   - `GET /api/reports/my-reports`
-4. توحيد naming/style بين الملفات (خصوصًا single quotes/double quotes في بعض الملفات).
-5. إضافة اختبارات تكامل للـ auth + reports.
-
----
-
-Last verified from actual files in `backend` on current workspace state.
+Last verified from current workspace files in `backend`.

@@ -248,6 +248,7 @@ export const login = async (req, res, next) => {
       success: true,
       message: "Login successful",
       token,
+      accessToken: token,
       data: userResponse,
     });
   } catch (error) {
@@ -301,6 +302,7 @@ export const loginAdmin = async (req, res, next) => {
       success: true,
       message: "Admin login successful",
       token,
+      accessToken: token,
       data: userResponse,
     });
   } catch (error) {

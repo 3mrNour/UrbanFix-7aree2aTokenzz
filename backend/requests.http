@@ -1,0 +1,220 @@
+@baseUrl = http://localhost:5000/api
+@rootUrl = http://localhost:5000
+@token = PUT_TOKEN_HERE
+@userId = 000000000000000000000000
+@reportId = 000000000000000000000000
+@taskId = 000000000000000000000000
+@technicianId = 000000000000000000000000
+
+### Health Check
+GET {{rootUrl}}/health
+
+############################################
+# Users & Auth
+############################################
+
+### Create Citizen User
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "fullName": "Citizen QA User",
+  "nationalId": "29801011234567",
+  "password": "StrongPass123!",
+  "phoneNumber": "+201001112233",
+  "role": "CITIZEN"
+}
+
+### Create Technician User
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "fullName": "Technician QA User",
+  "employeeId": "TECH-2201",
+  "password": "StrongPass123!",
+  "phoneNumber": "+201001112244",
+  "role": "TECHNICIAN"
+}
+
+### Citizen Sign In
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "nationalId": "29801011234567",
+  "password": "StrongPass123!"
+}
+
+### Staff/Technician Sign In
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "employeeId": "TECH-2201",
+  "password": "StrongPass123!"
+}
+
+### Admin Sign In
+POST {{baseUrl}}/users/admin/login
+Content-Type: application/json
+
+{
+  "employeeId": "ADMIN-0001",
+  "password": "Admin@12345"
+}
+
+### Get My Profile (Authenticated)
+GET {{baseUrl}}/users/profile
+Authorization: Bearer {{token}}
+
+### Get All Users (Governor only)
+GET {{baseUrl}}/users?page=1&limit=20&role=TECHNICIAN&isActive=true
+Authorization: Bearer {{token}}
+
+### Update User (Governor only)
+PATCH {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fullName": "Updated QA User",
+  "phoneNumber": "+201001112255",
+  "isActive": true,
+  "role": "TECHNICIAN"
+}
+
+### Deactivate/Reactivate User (Governor only)
+DELETE {{baseUrl}}/users/{{userId}}
+Authorization: Bearer {{token}}
+
+############################################
+# Citizen Reports
+############################################
+
+### Create Report (Citizen only)
+POST {{baseUrl}}/reports
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "category": "Roads",
+  "description": "Pothole causing traffic issues near district center.",
+  "urgency": "High",
+  "location": {
+    "type": "Point",
+    "coordinates": [31.2357, 30.0444]
+  },
+  "addressDescription": "Downtown main avenue",
+  "photoBefore": "/uploads/before/qa-before.jpg"
+}
+
+### Get My Reports (Citizen only)
+GET {{baseUrl}}/reports/my-reports
+Authorization: Bearer {{token}}
+
+############################################
+# Technician Tasks
+############################################
+
+### Get Assigned Tasks (Technician only)
+GET {{baseUrl}}/tasks
+Authorization: Bearer {{token}}
+
+### Get Task Details (Technician only)
+GET {{baseUrl}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Update Task Status to IN_PROGRESS (Technician only)
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="status"
+
+IN_PROGRESS
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+### Update Task Status to RESOLVED with photoAfter (Technician only)
+# NOTE: Replace LOCAL_FILE_PATH with a valid path in your machine.
+PATCH {{baseUrl}}/tasks/{{taskId}}/status
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="status"
+
+RESOLVED
+------WebKitFormBoundary7MA4YWxkTrZu0gW
+Content-Disposition: form-data; name="photoAfter"; filename="after.jpg"
+Content-Type: image/jpeg
+
+< ./LOCAL_FILE_PATH/after.jpg
+------WebKitFormBoundary7MA4YWxkTrZu0gW--
+
+############################################
+# Governor (City-level oversight)
+############################################
+
+### Governor - Global Reports Grid
+GET {{baseUrl}}/governor/reports?status=PENDING&category=Roads&urgency=High&fromDate=2026-01-01&toDate=2026-12-31
+Authorization: Bearer {{token}}
+
+### Governor - System Analytics
+GET {{baseUrl}}/governor/analytics
+Authorization: Bearer {{token}}
+
+### Governor - Heatmap Data
+GET {{baseUrl}}/governor/heatmap?status=IN_PROGRESS&urgency=High
+Authorization: Bearer {{token}}
+
+############################################
+# District Manager
+############################################
+
+### Manager - Get District Reports
+GET {{baseUrl}}/manager/reports?status=PENDING&category=Roads&urgency=High
+Authorization: Bearer {{token}}
+
+### Manager - Review Report as VALID (category required)
+PATCH {{baseUrl}}/manager/reports/{{reportId}}/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "VALID",
+  "category": "Electricity"
+}
+
+### Manager - Review Report as REJECTED
+PATCH {{baseUrl}}/manager/reports/{{reportId}}/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "REJECTED"
+}
+
+### Manager - Review Report as SPAM
+PATCH {{baseUrl}}/manager/reports/{{reportId}}/review
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "status": "SPAM"
+}
+
+### Manager - Suggest Best Technicians
+GET {{baseUrl}}/manager/reports/{{reportId}}/suggestions
+Authorization: Bearer {{token}}
+
+### Manager - Assign Report to Technician
+PATCH {{baseUrl}}/manager/reports/{{reportId}}/assign
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "technicianId": "{{technicianId}}"
+}
+
