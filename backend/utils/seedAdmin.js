@@ -19,10 +19,6 @@ export const ensureDefaultAdmin = async () => {
 
   const existingAdmin = await User.findOne({ employeeId: config.employeeId });
   if (existingAdmin) {
-    if (!existingAdmin.isActive) {
-      existingAdmin.isActive = true;
-      await existingAdmin.save();
-    }
     return existingAdmin;
   }
 
@@ -32,7 +28,6 @@ export const ensureDefaultAdmin = async () => {
     phoneNumber: config.phoneNumber,
     password: config.password,
     role: config.role,
-    isActive: true,
   });
 
   return createdAdmin;

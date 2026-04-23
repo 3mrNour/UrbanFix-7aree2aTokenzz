@@ -85,10 +85,5 @@ export const updateUserValidator = [
     .isLength({ min: 3, max: 30 })
     .withMessage("Employee ID must be between 3 and 30 characters"),
 
-  body("isActive")
-    .optional()
-    .isBoolean()
-    .withMessage("isActive must be a boolean value"),
-
   body("password").not().exists().withMessage("Password update is not allowed from this endpoint"),
 ];

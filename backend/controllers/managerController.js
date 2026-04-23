@@ -4,10 +4,13 @@ import User from "../models/User.js";
 import { ReportStatus, UserRoles } from "../utils/enums.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+const ACTIVE_TECH_TASK_STATUSES = [ReportStatus.VALID, ReportStatus.IN_PROGRESS];
 
-export const getPendingReports = async (_req, res, next) => {
+export const getPendingReports = async (req, res, next) => {
   try {
-    const reports = await Report.find({ status: ReportStatus.PENDING })
+    const reports = await Report.find({
+      status: ReportStatus.PENDING,
+    })
       .populate("citizen", "fullName phoneNumber nationalId")
       .sort({ createdAt: -1 });
 
@@ -59,6 +62,12 @@ export const reviewReport = async (req, res, next) => {
       report.rejectionReason = rejectionReason.trim();
       report.assignedTechnician = undefined;
     } else {
+      if (report.status !== ReportStatus.PENDING) {
+        return res.status(400).json({
+          success: false,
+          message: "Only PENDING reports can be approved",
+        });
+      }
       report.status = ReportStatus.VALID;
       report.rejectionReason = undefined;
     }
@@ -75,15 +84,12 @@ export const reviewReport = async (req, res, next) => {
   }
 };
 
-export const getAvailableTechnicians = async (_req, res, next) => {
+export const getAvailableTechnicians = async (req, res, next) => {
   try {
-    const activeStatuses = [ReportStatus.VALID, ReportStatus.IN_PROGRESS];
-
     const technicians = await User.aggregate([
       {
         $match: {
           role: UserRoles.TECHNICIAN,
-          isActive: true,
         },
       },
       {
@@ -94,7 +100,7 @@ export const getAvailableTechnicians = async (_req, res, next) => {
             {
               $match: {
                 $expr: { $eq: ["$assignedTechnician", "$$technicianId"] },
-                status: { $in: activeStatuses },
+                status: { $in: ACTIVE_TECH_TASK_STATUSES },
               },
             },
           ],
@@ -113,7 +119,6 @@ export const getAvailableTechnicians = async (_req, res, next) => {
           employeeId: 1,
           districtId: 1,
           activeTaskCount: 1,
-          isActive: 1,
         },
       },
       { $sort: { activeTaskCount: 1, createdAt: 1 } },
@@ -122,6 +127,96 @@ export const getAvailableTechnicians = async (_req, res, next) => {
     return res.status(200).json({
       success: true,
       data: technicians,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getTechnicianSuggestions = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid report id",
+      });
+    }
+
+    const report = await Report.findById(id).select(
+      "_id location"
+    );
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+
+    const hasCoords =
+      Array.isArray(report.location?.coordinates) && report.location.coordinates.length === 2;
+
+    const suggestions = await User.aggregate([
+      ...(hasCoords
+        ? [
+            {
+              $geoNear: {
+                near: {
+                  type: "Point",
+                  coordinates: report.location.coordinates,
+                },
+                distanceField: "distanceMeters",
+                spherical: true,
+                query: {
+                  role: UserRoles.TECHNICIAN,
+                },
+              },
+            },
+          ]
+        : [
+            {
+              $match: {
+                role: UserRoles.TECHNICIAN,
+              },
+            },
+          ]),
+      {
+        $lookup: {
+          from: "reports",
+          let: { technicianId: "$_id" },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$assignedTechnician", "$$technicianId"] },
+                status: { $in: ACTIVE_TECH_TASK_STATUSES },
+              },
+            },
+          ],
+          as: "activeTasks",
+        },
+      },
+      {
+        $addFields: {
+          activeTaskCount: { $size: "$activeTasks" },
+        },
+      },
+      {
+        $project: {
+          fullName: 1,
+          phoneNumber: 1,
+          employeeId: 1,
+          activeTaskCount: 1,
+          distanceMeters: 1,
+        },
+      },
+      { $sort: { activeTaskCount: 1, distanceMeters: 1, createdAt: 1 } },
+      { $limit: 10 },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: suggestions,
     });
   } catch (error) {
     return next(error);
@@ -152,10 +247,10 @@ export const assignTask = async (req, res, next) => {
       });
     }
 
-    if (!technician || technician.role !== UserRoles.TECHNICIAN || !technician.isActive) {
+    if (!technician || technician.role !== UserRoles.TECHNICIAN) {
       return res.status(400).json({
         success: false,
-        message: "Assigned user must be an active technician",
+        message: "Assigned user must be a technician",
       });
     }
 
@@ -208,14 +303,12 @@ export const delegateTasks = async (req, res, next) => {
       fromTech &&
       toTech &&
       fromTech.role === UserRoles.TECHNICIAN &&
-      toTech.role === UserRoles.TECHNICIAN &&
-      fromTech.isActive &&
-      toTech.isActive;
+      toTech.role === UserRoles.TECHNICIAN;
 
     if (!bothValidTechnicians) {
       return res.status(400).json({
         success: false,
-        message: "Both technicians must exist, be active, and have TECHNICIAN role",
+        message: "Both users must exist and have TECHNICIAN role",
       });
     }
 

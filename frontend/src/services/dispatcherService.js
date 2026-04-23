@@ -15,6 +15,11 @@ export const getAvailableTechnicians = async () => {
   return data;
 };
 
+export const getTechnicianSuggestions = async (reportId) => {
+  const { data } = await api.get(`/manager/reports/${reportId}/technicians/suggestions`);
+  return data;
+};
+
 export const assignTask = async (reportId, technicianId) => {
   const { data } = await api.patch(`/manager/reports/${reportId}/assign`, { technicianId });
   return data;

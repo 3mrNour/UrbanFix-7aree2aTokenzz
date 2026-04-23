@@ -2,6 +2,29 @@ import mongoose from "mongoose";
 import bcrypt from "bcrypt";
 import { UserRoles } from "../utils/enums.js";
 
+const pointSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      enum: ["Point"],
+      required: true,
+      default: "Point",
+    },
+    coordinates: {
+      type: [Number],
+      required: true,
+      validate: {
+        validator: (coords) =>
+          Array.isArray(coords) &&
+          coords.length === 2 &&
+          coords.every((value) => Number.isFinite(value)),
+        message: "Coordinates must be [longitude, latitude]",
+      },
+    },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     fullName: {
@@ -47,19 +70,8 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
     currentLocation: {
-      type: {
-        type: String,
-        enum: ["Point"],
-        default: "Point",
-      },
-      coordinates: {
-        type: [Number],
-        default: undefined,
-      },
-    },
-    isActive: {
-      type: Boolean,
-      default: true,
+      type: pointSchema,
+      default: undefined,
     },
     deletedAt: {
       type: Date,

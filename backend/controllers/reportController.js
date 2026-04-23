@@ -2,10 +2,20 @@ import Report from "../models/report.model.js";
 
 export const createReport = async (req, res, next) => {
   try {
-    const { category, description, urgency, location, addressDescription, photoBefore } = req.body;
+    const { category, description, urgency, addressDescription } = req.body;
     const districtId = req.user?.districtId || null;
+    const photoBefore = req.file ? `/uploads/reports/before/${req.file.filename}` : null;
 
-    if (!category || !description || !photoBefore || !location?.coordinates) {
+    let parsedLocation = req.body.location;
+    if (typeof parsedLocation === "string") {
+      try {
+        parsedLocation = JSON.parse(parsedLocation);
+      } catch {
+        parsedLocation = null;
+      }
+    }
+
+    if (!category || !description || !photoBefore || !parsedLocation?.coordinates) {
       return res.status(400).json({
         success: false,
         message: "category, description, photoBefore, and location.coordinates are required",
@@ -18,7 +28,7 @@ export const createReport = async (req, res, next) => {
       category,
       description,
       urgency,
-      location,
+      location: parsedLocation,
       addressDescription,
       photoBefore,
     });

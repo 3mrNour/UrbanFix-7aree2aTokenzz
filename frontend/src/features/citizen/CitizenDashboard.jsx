@@ -37,8 +37,23 @@ const getUrgencyStyles = (urgency) => {
   }
 };
 
+const STATUS_OPTIONS = [
+  "ALL",
+  "PENDING",
+  "VALID",
+  "IN_PROGRESS",
+  "RESOLVED",
+  "REJECTED",
+  "SPAM",
+  "ARCHIVED",
+];
+
+const STATUS_FLOW = ["PENDING", "VALID", "IN_PROGRESS", "RESOLVED"];
+
 const CitizenDashboard = () => {
   const [reports, setReports] = useState([]);
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [selectedReport, setSelectedReport] = useState(null);
   const [loadingReports, setLoadingReports] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [coordinates, setCoordinates] = useState(null);
@@ -67,6 +82,11 @@ const CitizenDashboard = () => {
       return {};
     }
   }, []);
+
+  const filteredReports = useMemo(() => {
+    if (statusFilter === "ALL") return reports;
+    return reports.filter((report) => report.status === statusFilter);
+  }, [reports, statusFilter]);
 
   const fetchMyReports = async () => {
     try {
@@ -103,16 +123,14 @@ const CitizenDashboard = () => {
       setSubmitting(true);
       setError("");
       setMessage("");
-
-      const fileName = values.photoBefore?.[0]?.name || "report-photo.jpg";
-      const photoPath = `/uploads/before/${fileName}`;
+      const photoFile = values.photoBefore?.[0];
 
       const payload = {
         category: values.category,
         description: values.description,
         urgency: values.urgency,
         addressDescription: values.addressDescription || "",
-        photoBefore: photoPath,
+        photoBefore: photoFile,
         location: {
           type: "Point",
           coordinates: coordinates || [31.2357, 30.0444],
@@ -318,9 +336,22 @@ const CitizenDashboard = () => {
                 <LayoutList className="w-5 h-5 text-indigo-600" />
                 <h2 className="text-lg font-bold text-slate-900">My Reports</h2>
               </div>
-              <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">
-                {reports.length} Total
-              </span>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700"
+                  >
+                    {STATUS_OPTIONS.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">
+                    {filteredReports.length} Result
+                  </span>
+                </div>
             </div>
 
             {loadingReports ? (
@@ -328,14 +359,14 @@ const CitizenDashboard = () => {
                 <div className="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
                 <p className="text-sm font-medium">Loading your reports...</p>
               </div>
-            ) : reports.length === 0 ? (
+            ) : filteredReports.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3 py-16 border-2 border-dashed border-slate-100 rounded-xl">
                 <FileText className="w-12 h-12 text-slate-300" />
-                <p className="text-sm font-medium text-slate-500">You haven't submitted any reports yet.</p>
+                <p className="text-sm font-medium text-slate-500">No reports match this filter.</p>
               </div>
             ) : (
               <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar pb-2" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-                {reports.map((report) => (
+                {filteredReports.map((report) => (
                   <article
                     key={report._id}
                     className="group relative rounded-xl border border-slate-200 p-5 hover:border-indigo-200 hover:shadow-md bg-white transition-all"
@@ -367,14 +398,97 @@ const CitizenDashboard = () => {
                       <p className="text-sm text-slate-600 leading-relaxed line-clamp-2">
                         {report.description}
                       </p>
+                      {report.photoBefore && (
+                        <img
+                          src={`http://localhost:5000${report.photoBefore}`}
+                          alt="Report evidence"
+                          className="mt-3 w-full max-w-sm h-40 object-cover rounded-lg border border-slate-200"
+                        />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReport(report)}
+                        className="mt-3 inline-flex items-center gap-2 rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-2 hover:bg-black"
+                      >
+                        Track Problem Flow
+                      </button>
                     </div>
                   </article>
                 ))}
               </div>
             )}
+
           </div>
         </section>
       </main>
+
+      {selectedReport && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-2xl max-h-[90vh] overflow-auto bg-white rounded-2xl border border-slate-200 shadow-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-900">Problem Flow Details</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedReport(null)}
+                className="text-xs font-semibold text-slate-600 hover:text-slate-900"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-3">
+              {STATUS_FLOW.map((step) => {
+                const currentIndex = STATUS_FLOW.indexOf(selectedReport.status);
+                const stepIndex = STATUS_FLOW.indexOf(step);
+                const active = currentIndex >= 0 && stepIndex <= currentIndex;
+                return (
+                  <span
+                    key={step}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                      active
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-slate-500 border-slate-200"
+                    }`}
+                  >
+                    {step}
+                  </span>
+                );
+              })}
+            </div>
+
+            <p className="text-xs text-slate-600 mb-4">
+              Current Status: <span className="font-bold text-slate-800">{selectedReport.status}</span>
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs font-semibold text-slate-700 mb-1.5">Before Photo</p>
+                {selectedReport.photoBefore ? (
+                  <img
+                    src={`http://localhost:5000${selectedReport.photoBefore}`}
+                    alt="Before issue"
+                    className="w-full h-44 object-cover rounded-lg border border-slate-200"
+                  />
+                ) : (
+                  <p className="text-xs text-slate-500">No before photo.</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-slate-700 mb-1.5">Resolution Photo</p>
+                {selectedReport.photoAfter ? (
+                  <img
+                    src={`http://localhost:5000${selectedReport.photoAfter}`}
+                    alt="Resolution proof"
+                    className="w-full h-44 object-cover rounded-lg border border-slate-200"
+                  />
+                ) : (
+                  <p className="text-xs text-slate-500">No resolution photo uploaded yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

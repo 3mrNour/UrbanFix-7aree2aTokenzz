@@ -1,7 +1,19 @@
 import api from "./api";
 
 export const createReport = async (payload) => {
-  const { data } = await api.post("/reports", payload);
+  const formData = new FormData();
+  formData.append("category", payload.category);
+  formData.append("description", payload.description);
+  formData.append("urgency", payload.urgency);
+  formData.append("addressDescription", payload.addressDescription || "");
+  formData.append("location", JSON.stringify(payload.location));
+  formData.append("photoBefore", payload.photoBefore);
+
+  const { data } = await api.post("/reports", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
   return data;
 };
 

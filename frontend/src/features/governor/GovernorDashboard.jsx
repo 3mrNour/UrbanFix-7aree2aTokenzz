@@ -1,11 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Users, FileWarning, LogOut, RefreshCw, Search, LayoutDashboard, Map } from "lucide-react";
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import {
   getGovernorAnalytics,
   getGovernorHeatmap,
   getGovernorReports,
 } from "../../services/governorService";
-import { getUsers, toggleUserStatus, updateUserById } from "../../services/userService";
+import { getUsers, updateUserById } from "../../services/userService";
+
+const DEFAULT_MAP_CENTER = [30.0444, 31.2357];
+const ASSETS_BASE_URL = "http://localhost:5000";
+
+const getPlotColor = (item) => {
+  if (item?.status === "RESOLVED") return "#10b981";
+  if (item?.status === "IN_PROGRESS") return "#3b82f6";
+  if (item?.status === "REJECTED") return "#6b7280";
+  if (item?.status === "SPAM") return "#111827";
+  if (item?.urgency === "High") return "#ef4444";
+  if (item?.urgency === "Medium") return "#f59e0b";
+  return "#84cc16";
+};
+
+const RecenterMap = ({ center }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (Array.isArray(center) && center.length === 2) {
+      map.setView(center, 12);
+    }
+  }, [center, map]);
+
+  return null;
+};
 
 const GovernorDashboard = () => {
   const [analytics, setAnalytics] = useState(null);
@@ -24,6 +51,8 @@ const GovernorDashboard = () => {
   });
   const [userRoleFilter, setUserRoleFilter] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
+  const [userLocation, setUserLocation] = useState(null);
+  const [selectedReportDetails, setSelectedReportDetails] = useState(null);
 
   const user = useMemo(() => {
     try {
@@ -66,17 +95,17 @@ const GovernorDashboard = () => {
     userRoleFilter,
   ]);
 
-  const handleUserActivation = async (userId) => {
-    try {
-      setMessage("");
-      setError("");
-      await toggleUserStatus(userId);
-      setMessage("User status updated successfully");
-      await loadDashboard();
-    } catch (e) {
-      setError(e?.response?.data?.message || "Failed to update user status");
-    }
-  };
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation([position.coords.latitude, position.coords.longitude]);
+      },
+      () => {
+        setUserLocation(null);
+      }
+    );
+  }, []);
 
   const handleRoleChange = async (userId, role) => {
     try {
@@ -95,6 +124,10 @@ const GovernorDashboard = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("role");
     window.location.assign("/");
+  };
+
+  const closeReportDetails = () => {
+    setSelectedReportDetails(null);
   };
 
   return (
@@ -316,16 +349,31 @@ const GovernorDashboard = () => {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50 sticky top-0">
                     <tr className="border-b border-slate-200 text-slate-600 font-semibold">
+                      <th className="py-3 px-4">Photo</th>
                       <th className="py-3 px-4">Category</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Urgency</th>
                       <th className="py-3 px-4">Citizen</th>
                       <th className="py-3 px-4">Technician</th>
+                      <th className="py-3 px-4">Details</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {reports.map((report) => (
                       <tr key={report._id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4">
+                          {report.photoBefore ? (
+                            <a href={`${ASSETS_BASE_URL}${report.photoBefore}`} target="_blank" rel="noreferrer">
+                              <img
+                                src={`${ASSETS_BASE_URL}${report.photoBefore}`}
+                                alt="Report"
+                                className="w-14 h-14 object-cover rounded-md border border-slate-200"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-400">No photo</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 font-medium text-slate-900">{report.category}</td>
                         <td className="py-3 px-4">
                           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold bg-slate-100 text-slate-700">
@@ -343,11 +391,19 @@ const GovernorDashboard = () => {
                         </td>
                         <td className="py-3 px-4 text-slate-600">{report.citizen?.fullName || "-"}</td>
                         <td className="py-3 px-4 text-slate-600">{report.assignedTechnician?.fullName || "-"}</td>
+                        <td className="py-3 px-4">
+                          <button
+                            onClick={() => setSelectedReportDetails(report)}
+                            className="rounded-lg bg-slate-900 text-white text-xs font-bold px-3 py-2 hover:bg-black"
+                          >
+                            View Details
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {!reports.length && !loading && (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center">
+                        <td colSpan={7} className="py-12 text-center">
                           <FileWarning className="w-8 h-8 text-slate-300 mx-auto mb-3" />
                           <p className="text-slate-500 font-medium">No reports match your filters.</p>
                         </td>
@@ -357,6 +413,80 @@ const GovernorDashboard = () => {
                 </table>
               </div>
             </section>
+          )}
+
+          {selectedReportDetails && (
+            <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+              <div className="w-full max-w-4xl max-h-[90vh] overflow-auto bg-white rounded-2xl border border-slate-200 shadow-2xl p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-slate-900">Problem Full Details</h3>
+                  <button
+                    onClick={closeReportDetails}
+                    className="rounded-lg border border-slate-200 bg-white text-slate-700 text-sm font-semibold px-3 py-2 hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="grid lg:grid-cols-2 gap-6 text-sm">
+                  <div className="space-y-2">
+                    <p><span className="font-semibold">Category:</span> {selectedReportDetails.category}</p>
+                    <p><span className="font-semibold">Status:</span> {selectedReportDetails.status}</p>
+                    <p><span className="font-semibold">Urgency:</span> {selectedReportDetails.urgency || "-"}</p>
+                    <p><span className="font-semibold">Citizen:</span> {selectedReportDetails.citizen?.fullName || "-"}</p>
+                    <p><span className="font-semibold">Citizen Phone:</span> {selectedReportDetails.citizen?.phoneNumber || "-"}</p>
+                    <p><span className="font-semibold">Handled By:</span> {selectedReportDetails.assignedTechnician?.fullName || "Not assigned"}</p>
+                    <p><span className="font-semibold">Technician Phone:</span> {selectedReportDetails.assignedTechnician?.phoneNumber || "-"}</p>
+                    <p>
+                      <span className="font-semibold">Created At:</span>{" "}
+                      {selectedReportDetails.createdAt
+                        ? new Date(selectedReportDetails.createdAt).toLocaleString()
+                        : "-"}
+                    </p>
+                    <p>
+                      <span className="font-semibold">Solved At:</span>{" "}
+                      {selectedReportDetails.status === "RESOLVED" && selectedReportDetails.updatedAt
+                        ? new Date(selectedReportDetails.updatedAt).toLocaleString()
+                        : "Not resolved yet"}
+                    </p>
+                    <p><span className="font-semibold">Description:</span> {selectedReportDetails.description || "-"}</p>
+                    <p><span className="font-semibold">Address:</span> {selectedReportDetails.addressDescription || "-"}</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <p className="font-semibold text-slate-800 mb-2">Before Fix</p>
+                      {selectedReportDetails.photoBefore ? (
+                        <a href={`${ASSETS_BASE_URL}${selectedReportDetails.photoBefore}`} target="_blank" rel="noreferrer">
+                          <img
+                            src={`${ASSETS_BASE_URL}${selectedReportDetails.photoBefore}`}
+                            alt="Before fix"
+                            className="w-full h-52 object-cover rounded-lg border border-slate-200"
+                          />
+                        </a>
+                      ) : (
+                        <p className="text-slate-500">No before image</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <p className="font-semibold text-slate-800 mb-2">After Fix</p>
+                      {selectedReportDetails.photoAfter ? (
+                        <a href={`${ASSETS_BASE_URL}${selectedReportDetails.photoAfter}`} target="_blank" rel="noreferrer">
+                          <img
+                            src={`${ASSETS_BASE_URL}${selectedReportDetails.photoAfter}`}
+                            alt="After fix"
+                            className="w-full h-52 object-cover rounded-lg border border-slate-200"
+                          />
+                        </a>
+                      ) : (
+                        <p className="text-slate-500">No after image uploaded yet</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* USERS TAB */}
@@ -387,13 +517,11 @@ const GovernorDashboard = () => {
                         <p className="font-bold text-slate-900 truncate">{u.fullName}</p>
                         <p className="text-xs font-medium text-slate-500 mt-0.5">{u.phoneNumber}</p>
                       </div>
-                      <span className={`text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-md border ${
-                        u.isActive ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-rose-50 text-rose-700 border-rose-200"
-                      }`}>
-                        {u.isActive ? "ACTIVE" : "INACTIVE"}
+                      <span className="text-[10px] uppercase tracking-wider font-bold px-2.5 py-1 rounded-md border bg-emerald-50 text-emerald-700 border-emerald-200">
+                        ACTIVE
                       </span>
                     </div>
-                    <div className="pt-4 border-t border-slate-100 grid grid-cols-2 gap-3">
+                    <div className="pt-4 border-t border-slate-100 grid grid-cols-1 gap-3">
                       <select
                         value={u.role}
                         onChange={(e) => handleRoleChange(u._id, e.target.value)}
@@ -404,16 +532,6 @@ const GovernorDashboard = () => {
                         <option value="MANAGER">MANAGER</option>
                         <option value="GOVERNOR">GOVERNOR</option>
                       </select>
-                      <button
-                        onClick={() => handleUserActivation(u._id)}
-                        className={`rounded-lg text-xs font-bold px-3 py-2 transition-colors ${
-                          u.isActive 
-                            ? "bg-white border border-rose-200 text-rose-600 hover:bg-rose-50" 
-                            : "bg-indigo-600 border border-transparent text-white hover:bg-indigo-700"
-                        }`}
-                      >
-                        {u.isActive ? "Deactivate" : "Activate"}
-                      </button>
                     </div>
                   </div>
                 ))}
@@ -438,29 +556,68 @@ const GovernorDashboard = () => {
                   {heatmapData.length} Map Points
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 overflow-auto pr-2 custom-scrollbar content-start flex-1">
-                {heatmapData.slice(0, 50).map((item) => (
-                  <div key={item._id} className="border border-slate-200 rounded-xl p-4 bg-slate-50/50 hover:bg-white hover:border-indigo-200 transition-colors">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-bold text-slate-800 text-sm">{item.category}</span>
-                      <span className="text-[10px] font-bold uppercase px-2 py-1 bg-slate-200 text-slate-700 rounded-md">{item.status}</span>
-                    </div>
-                    <div className="flex items-start gap-2 mt-3 text-slate-500">
-                      <Map className="w-4 h-4 mt-0.5 shrink-0 text-indigo-400" />
-                      <p className="text-xs font-medium font-mono leading-relaxed">
-                        {Array.isArray(item.location?.coordinates)
-                          ? `Lat: ${item.location.coordinates[1]?.toFixed(4)}\nLng: ${item.location.coordinates[0]?.toFixed(4)}`
-                          : "Location data unavailable"}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-                {!heatmapData.length && !loading && (
-                  <div className="col-span-full py-12 text-center">
-                    <Map className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                    <p className="text-sm font-medium text-slate-500">No heatmap points available.</p>
-                  </div>
-                )}
+              <div className="flex-1 overflow-hidden rounded-xl border border-slate-200">
+                <MapContainer
+                  center={userLocation || DEFAULT_MAP_CENTER}
+                  zoom={11}
+                  scrollWheelZoom
+                  className="h-full w-full"
+                >
+                  <RecenterMap center={userLocation || DEFAULT_MAP_CENTER} />
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+
+                  {userLocation && (
+                    <CircleMarker center={userLocation} radius={9} pathOptions={{ color: "#4f46e5", fillColor: "#6366f1", fillOpacity: 0.9 }}>
+                      <Popup>
+                        <div className="text-xs">
+                          <p className="font-bold text-slate-900">Your Current Location</p>
+                        </div>
+                      </Popup>
+                    </CircleMarker>
+                  )}
+
+                  {heatmapData
+                    .filter((item) => Array.isArray(item.location?.coordinates) && item.location.coordinates.length === 2)
+                    .map((item) => (
+                      <CircleMarker
+                        key={item._id}
+                        center={[item.location.coordinates[1], item.location.coordinates[0]]}
+                        radius={8}
+                        pathOptions={{
+                          color: getPlotColor(item),
+                          fillColor: getPlotColor(item),
+                          fillOpacity: 0.75,
+                        }}
+                      >
+                        <Popup>
+                          <div className="text-xs min-w-[200px]">
+                            <p className="font-bold text-slate-900">{item.category}</p>
+                            <p className="text-slate-600 mt-1">
+                              <span className="font-semibold">Status:</span> {item.status}
+                            </p>
+                            <p className="text-slate-600">
+                              <span className="font-semibold">Urgency:</span> {item.urgency}
+                            </p>
+                            <p className="text-slate-600 line-clamp-3 mt-1">
+                              {item.description || item.addressDescription || "No extra details"}
+                            </p>
+                            {item.photoBefore && (
+                              <a href={`${ASSETS_BASE_URL}${item.photoBefore}`} target="_blank" rel="noreferrer">
+                                <img
+                                  src={`${ASSETS_BASE_URL}${item.photoBefore}`}
+                                  alt="Heatmap report"
+                                  className="mt-2 w-full h-24 object-cover rounded border border-slate-200"
+                                />
+                              </a>
+                            )}
+                          </div>
+                        </Popup>
+                      </CircleMarker>
+                    ))}
+                </MapContainer>
               </div>
             </section>
           )}

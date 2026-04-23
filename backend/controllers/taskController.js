@@ -81,6 +81,27 @@ export const updateTaskStatus = async (req, res, next) => {
       });
     }
 
+    if (task.status === ReportStatus.REJECTED || task.status === ReportStatus.SPAM) {
+      return res.status(400).json({
+        success: false,
+        message: "Rejected or spam reports cannot be processed as technician tasks",
+      });
+    }
+
+    if (status === ReportStatus.IN_PROGRESS && task.status !== ReportStatus.VALID) {
+      return res.status(400).json({
+        success: false,
+        message: "Task can move to IN_PROGRESS only from VALID",
+      });
+    }
+
+    if (status === ReportStatus.RESOLVED && task.status !== ReportStatus.IN_PROGRESS) {
+      return res.status(400).json({
+        success: false,
+        message: "Task can move to RESOLVED only from IN_PROGRESS",
+      });
+    }
+
     // Closure Validation: a proof-of-work photo is mandatory on RESOLVED.
     if (status === ReportStatus.RESOLVED && !req.file) {
       return res.status(400).json({

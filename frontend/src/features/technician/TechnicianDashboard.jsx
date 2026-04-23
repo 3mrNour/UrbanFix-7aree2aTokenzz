@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { ClipboardList, LogOut, MapPin, RefreshCw, Wrench } from "lucide-react";
 import { getAssignedTasks, getTaskDetails, updateTaskStatus } from "../../services/taskService";
 
+const ASSETS_BASE_URL = "http://localhost:5000";
+
 const TechnicianDashboard = () => {
   const [tasks, setTasks] = useState([]);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -152,6 +154,25 @@ const TechnicianDashboard = () => {
           </button>
         </header>
 
+        <div className="lg:hidden bg-white border-b border-slate-100 px-4 py-2 flex gap-2">
+          <button
+            onClick={() => setActiveTab("tasks")}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${
+              activeTab === "tasks" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab("details")}
+            className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${
+              activeTab === "details" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            Details
+          </button>
+        </div>
+
         <main className="flex-1 overflow-auto p-6 space-y-5">
           {message && (
             <div className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
@@ -170,6 +191,7 @@ const TechnicianDashboard = () => {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200 text-slate-600 font-semibold">
+                      <th className="py-3 px-4">Photo</th>
                       <th className="py-3 px-4">Category</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Urgency</th>
@@ -180,8 +202,23 @@ const TechnicianDashboard = () => {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {tasks.map((task) => (
                       <tr key={task._id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4">
+                          {task.photoBefore ? (
+                            <a href={`${ASSETS_BASE_URL}${task.photoBefore}`} target="_blank" rel="noreferrer">
+                              <img
+                                src={`${ASSETS_BASE_URL}${task.photoBefore}`}
+                                alt="Task"
+                                className="w-14 h-14 object-cover rounded-md border border-slate-200"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-400">No photo</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 font-medium text-slate-900">{task.category}</td>
-                        <td className="py-3 px-4">{task.status}</td>
+                        <td className="py-3 px-4">
+                          {task.status === "VALID" ? "PENDING_EXECUTION" : task.status}
+                        </td>
                         <td className="py-3 px-4">{task.urgency}</td>
                         <td className="py-3 px-4">{task.citizen?.fullName || "-"}</td>
                         <td className="py-3 px-4">
@@ -199,7 +236,7 @@ const TechnicianDashboard = () => {
                     ))}
                     {!tasks.length && !loading && (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-slate-500">
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
                           No assigned tasks found.
                         </td>
                       </tr>
@@ -231,14 +268,28 @@ const TechnicianDashboard = () => {
                         : "N/A"}
                     </p>
                     {selectedTask.photoBefore && (
-                      <a
-                        href={`http://localhost:5000${selectedTask.photoBefore}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-block text-indigo-600 font-semibold hover:underline"
-                      >
-                        View Photo Before
-                      </a>
+                      <div className="pt-2">
+                        <p className="font-semibold mb-1">Photo Before:</p>
+                        <a href={`${ASSETS_BASE_URL}${selectedTask.photoBefore}`} target="_blank" rel="noreferrer">
+                          <img
+                            src={`${ASSETS_BASE_URL}${selectedTask.photoBefore}`}
+                            alt="Before task"
+                            className="w-full max-w-sm h-44 object-cover rounded-lg border border-slate-200"
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {selectedTask.photoAfter && (
+                      <div className="pt-2">
+                        <p className="font-semibold mb-1">Photo After:</p>
+                        <a href={`${ASSETS_BASE_URL}${selectedTask.photoAfter}`} target="_blank" rel="noreferrer">
+                          <img
+                            src={`${ASSETS_BASE_URL}${selectedTask.photoAfter}`}
+                            alt="After task"
+                            className="w-full max-w-sm h-44 object-cover rounded-lg border border-slate-200"
+                          />
+                        </a>
+                      </div>
                     )}
                   </div>
                 )}
@@ -260,6 +311,11 @@ const TechnicianDashboard = () => {
                         <option value="IN_PROGRESS">IN_PROGRESS</option>
                         <option value="RESOLVED">RESOLVED</option>
                       </select>
+                      {selectedTask?.status === "VALID" && (
+                        <p className="mt-2 text-xs text-slate-500">
+                          First move task to <strong>IN_PROGRESS</strong>, then close it as <strong>RESOLVED</strong>.
+                        </p>
+                      )}
                     </div>
 
                     <div>

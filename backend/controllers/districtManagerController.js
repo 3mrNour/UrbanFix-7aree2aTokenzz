@@ -117,7 +117,6 @@ export const suggestBestTechnicians = async (req, res, next) => {
                 query: {
                   role: UserRoles.TECHNICIAN,
                   districtId: new mongoose.Types.ObjectId(districtId),
-                  isActive: true,
                 },
               },
             },
@@ -127,7 +126,6 @@ export const suggestBestTechnicians = async (req, res, next) => {
               $match: {
                 role: UserRoles.TECHNICIAN,
                 districtId: new mongoose.Types.ObjectId(districtId),
-                isActive: true,
               },
             },
           ]),
@@ -198,7 +196,6 @@ export const assignReportToTechnician = async (req, res, next) => {
         _id: technicianId,
         districtId,
         role: UserRoles.TECHNICIAN,
-        isActive: true,
       }),
     ]);
 

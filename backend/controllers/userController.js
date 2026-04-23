@@ -42,8 +42,6 @@ export const createUser = async (req, res, next) => {
       role,
       nationalId: role === UserRoles.CITIZEN ? nationalId : undefined,
       employeeId: role !== UserRoles.CITIZEN ? employeeId : undefined,
-      // Hackathon-friendly behavior: citizen accounts can sign in immediately.
-      isActive: role === UserRoles.CITIZEN,
     };
 
     const createdUser = await User.create(payload);
@@ -58,7 +56,6 @@ export const createUser = async (req, res, next) => {
         role: createdUser.role,
         nationalId: createdUser.nationalId,
         employeeId: createdUser.employeeId,
-        isActive: createdUser.isActive,
         createdAt: createdUser.createdAt,
       },
     });
@@ -103,11 +100,10 @@ export const getUserProfile = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
   try {
-    const { role, isActive, page = 1, limit = 20 } = req.query;
+    const { role, page = 1, limit = 20 } = req.query;
 
     const filters = {};
     if (role) filters.role = role;
-    if (typeof isActive !== "undefined") filters.isActive = isActive === "true";
 
     const pageNumber = Math.max(Number(page) || 1, 1);
     const limitNumber = Math.min(Math.max(Number(limit) || 20, 1), 100);
@@ -139,7 +135,7 @@ export const updateUser = async (req, res, next) => {
     if (validationResponse) return validationResponse;
 
     const { id } = req.params;
-    const allowedFields = ["fullName", "phoneNumber", "nationalId", "employeeId", "role", "isActive"];
+    const allowedFields = ["fullName", "phoneNumber", "nationalId", "employeeId", "role"];
 
     const updates = Object.fromEntries(
       Object.entries(req.body).filter(
@@ -188,18 +184,13 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-    const isActive = !user.isActive;
-    const deletedAt = isActive ? null : new Date();
-    
-    await User.findByIdAndUpdate(id, { isActive, deletedAt }, { runValidators: false });
+    await User.findByIdAndDelete(id);
 
     return res.status(200).json({
       success: true,
-      message: `User has been ${isActive ? "reactivated" : "deactivated"} successfully`,
+      message: "User deleted successfully",
       data: {
         id: user._id,
-        isActive,
-        deletedAt,
       },
     });
   } catch (error) {
@@ -233,13 +224,6 @@ export const login = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: "Invalid credentials",
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: "Account is inactive",
       });
     }
 
@@ -287,13 +271,6 @@ export const loginAdmin = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: "Invalid admin credentials",
-      });
-    }
-
-    if (!admin.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: "Admin account is inactive",
       });
     }
 

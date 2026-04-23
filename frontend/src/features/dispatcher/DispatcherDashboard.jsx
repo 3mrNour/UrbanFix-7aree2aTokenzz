@@ -5,13 +5,17 @@ import {
   delegateTasks,
   getAvailableTechnicians,
   getPendingReports,
+  getTechnicianSuggestions,
   reviewReport,
 } from "../../services/dispatcherService";
+
+const ASSETS_BASE_URL = "http://localhost:5000";
 
 const DispatcherDashboard = () => {
   const [reports, setReports] = useState([]);
   const [technicians, setTechnicians] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [suggestedTechnicians, setSuggestedTechnicians] = useState([]);
   const [reviewAction, setReviewAction] = useState("APPROVE");
   const [rejectionReason, setRejectionReason] = useState("");
   const [selectedTechnician, setSelectedTechnician] = useState("");
@@ -75,9 +79,40 @@ const DispatcherDashboard = () => {
     setSelectedReport(report);
     setReviewAction("APPROVE");
     setRejectionReason("");
-    if (technicians.length) {
-      setSelectedTechnician(technicians[0]._id);
-    }
+    setSuggestedTechnicians([]);
+    setSelectedTechnician("");
+  };
+
+  useEffect(() => {
+    const loadSuggestions = async () => {
+      if (!selectedReport?._id) return;
+      try {
+        const response = await getTechnicianSuggestions(selectedReport._id);
+        const list = response?.data || [];
+        setSuggestedTechnicians(list);
+        if (list.length) {
+          setSelectedTechnician(list[0]._id);
+        } else if (technicians.length) {
+          setSelectedTechnician(technicians[0]._id);
+        }
+      } catch {
+        // Fallback to general technicians list if suggestions endpoint is unavailable.
+        setSuggestedTechnicians([]);
+        if (technicians.length) {
+          setSelectedTechnician(technicians[0]._id);
+        }
+      }
+    };
+
+    loadSuggestions();
+  }, [selectedReport?._id, technicians]);
+
+  const techniciansForAssignment = suggestedTechnicians.length ? suggestedTechnicians : technicians;
+
+  const formatDistance = (distanceMeters) => {
+    if (typeof distanceMeters !== "number") return "N/A";
+    if (distanceMeters < 1000) return `${Math.round(distanceMeters)}m`;
+    return `${(distanceMeters / 1000).toFixed(1)}km`;
   };
 
   const handleReview = async () => {
@@ -164,7 +199,7 @@ const DispatcherDashboard = () => {
             }`}
           >
             <Search className="w-5 h-5" />
-            District Reports
+            Reports Triage
           </button>
           <button
             onClick={() => setActiveTab("dispatch")}
@@ -223,6 +258,33 @@ const DispatcherDashboard = () => {
           </button>
         </header>
 
+        <div className="lg:hidden bg-white border-b border-slate-100 px-3 py-2 grid grid-cols-3 gap-2">
+          <button
+            onClick={() => setActiveTab("reports")}
+            className={`rounded-lg px-2 py-2 text-xs font-bold ${
+              activeTab === "reports" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            Triage
+          </button>
+          <button
+            onClick={() => setActiveTab("dispatch")}
+            className={`rounded-lg px-2 py-2 text-xs font-bold ${
+              activeTab === "dispatch" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            Assign
+          </button>
+          <button
+            onClick={() => setActiveTab("delegate")}
+            className={`rounded-lg px-2 py-2 text-xs font-bold ${
+              activeTab === "delegate" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
+            }`}
+          >
+            Delegate
+          </button>
+        </div>
+
         <main className="flex-1 overflow-auto p-6 space-y-5">
           {message && (
             <div className="text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl p-4">
@@ -253,6 +315,7 @@ const DispatcherDashboard = () => {
                 <table className="w-full text-sm text-left">
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200 text-slate-600 font-semibold">
+                      <th className="py-3 px-4">Photo</th>
                       <th className="py-3 px-4">Category</th>
                       <th className="py-3 px-4">Status</th>
                       <th className="py-3 px-4">Urgency</th>
@@ -263,6 +326,19 @@ const DispatcherDashboard = () => {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {reports.map((report) => (
                       <tr key={report._id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4">
+                          {report.photoBefore ? (
+                            <a href={`${ASSETS_BASE_URL}${report.photoBefore}`} target="_blank" rel="noreferrer">
+                              <img
+                                src={`${ASSETS_BASE_URL}${report.photoBefore}`}
+                                alt="Report"
+                                className="w-14 h-14 object-cover rounded-md border border-slate-200"
+                              />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-slate-400">No photo</span>
+                          )}
+                        </td>
                         <td className="py-3 px-4 font-medium text-slate-900">{report.category}</td>
                         <td className="py-3 px-4">{report.status}</td>
                         <td className="py-3 px-4">{report.urgency}</td>
@@ -282,7 +358,7 @@ const DispatcherDashboard = () => {
                     ))}
                     {!reports.length && !loading && (
                       <tr>
-                        <td colSpan={5} className="py-12 text-center text-slate-500">
+                        <td colSpan={6} className="py-12 text-center text-slate-500">
                           No pending reports found.
                         </td>
                       </tr>
@@ -307,6 +383,15 @@ const DispatcherDashboard = () => {
                       <p><span className="font-semibold">Urgency:</span> {selectedReport.urgency}</p>
                       <p><span className="font-semibold">Citizen:</span> {selectedReport.citizen?.fullName || "-"}</p>
                       <p><span className="font-semibold">Description:</span> {selectedReport.description || "-"}</p>
+                      {selectedReport.photoBefore && (
+                        <a href={`${ASSETS_BASE_URL}${selectedReport.photoBefore}`} target="_blank" rel="noreferrer">
+                          <img
+                            src={`${ASSETS_BASE_URL}${selectedReport.photoBefore}`}
+                            alt="Before report"
+                            className="mt-2 w-full max-w-sm h-44 object-cover rounded-lg border border-slate-200"
+                          />
+                        </a>
+                      )}
                     </div>
 
                     <select
@@ -344,7 +429,7 @@ const DispatcherDashboard = () => {
                 ) : (
                   <div className="space-y-4">
                     <p className="text-sm text-slate-600">
-                      Technicians are sorted by active task count (least busy first).
+                      Suggested technicians are ranked by workload then geo proximity.
                     </p>
                     <select
                       value={selectedTechnician}
@@ -352,9 +437,9 @@ const DispatcherDashboard = () => {
                       className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                     >
                       <option value="">Select Technician</option>
-                      {technicians.map((tech) => (
+                      {techniciansForAssignment.map((tech) => (
                         <option key={tech._id} value={tech._id}>
-                          {tech.fullName} | active tasks: {tech.activeTaskCount}
+                          {tech.fullName} | active: {tech.activeTaskCount} | distance: {formatDistance(tech.distanceMeters)}
                         </option>
                       ))}
                     </select>

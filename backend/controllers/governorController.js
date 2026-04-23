@@ -123,7 +123,7 @@ export const getHeatmapMapData = async (req, res, next) => {
   try {
     const filters = buildReportsFilter(req.query);
     const heatmapData = await Report.find(filters).select(
-      "location status urgency category createdAt"
+      "location status urgency category description addressDescription createdAt"
     );
 
     return res.status(200).json({
