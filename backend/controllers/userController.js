@@ -42,6 +42,8 @@ export const createUser = async (req, res, next) => {
       role,
       nationalId: role === UserRoles.CITIZEN ? nationalId : undefined,
       employeeId: role !== UserRoles.CITIZEN ? employeeId : undefined,
+      // Hackathon-friendly behavior: citizen accounts can sign in immediately.
+      isActive: role === UserRoles.CITIZEN,
     };
 
     const createdUser = await User.create(payload);
