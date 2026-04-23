@@ -1,18 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRightLeft, ClipboardCheck, LogOut, Search, Send, UserRoundCheck } from "lucide-react";
+import { ArrowRightLeft, ClipboardCheck, LogOut, Search, UserRoundCheck } from "lucide-react";
 import {
-  assignTask,
   delegateTasks,
   getAvailableTechnicians,
   getPendingReports,
   getTechnicianSuggestions,
-  reviewReport,
+  processReport,
 } from "../../services/dispatcherService";
 
 const ASSETS_BASE_URL = "http://localhost:5000";
 
 const DispatcherDashboard = () => {
   const [reports, setReports] = useState([]);
+  const [reportStatusFilter, setReportStatusFilter] = useState("");
   const [technicians, setTechnicians] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
   const [suggestedTechnicians, setSuggestedTechnicians] = useState([]);
@@ -38,7 +38,9 @@ const DispatcherDashboard = () => {
     try {
       setLoading(true);
       setError("");
-      const response = await getPendingReports();
+      const response = await getPendingReports({
+        status: reportStatusFilter || undefined,
+      });
       setReports(response?.data || []);
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load pending reports");
@@ -73,7 +75,7 @@ const DispatcherDashboard = () => {
   useEffect(() => {
     loadReports();
     loadTechnicians();
-  }, []);
+  }, [reportStatusFilter]);
 
   const openReport = (report) => {
     setSelectedReport(report);
@@ -115,38 +117,27 @@ const DispatcherDashboard = () => {
     return `${(distanceMeters / 1000).toFixed(1)}km`;
   };
 
-  const handleReview = async () => {
-    if (!selectedReport?._id) return;
+  const handleProcessReport = async () => {
+    if (!selectedReport?._id || !selectedTechnician || !reviewAction) return;
 
     try {
       setMessage("");
       setError("");
       const payload =
         reviewAction === "REJECT"
-          ? { action: "REJECT", rejectionReason: rejectionReason.trim() }
-          : { action: "APPROVE" };
+          ? {
+              action: "REJECT",
+              technicianId: selectedTechnician,
+              rejectionReason: rejectionReason.trim(),
+            }
+          : { action: "APPROVE", technicianId: selectedTechnician };
 
-      await reviewReport(selectedReport._id, payload);
-      setMessage("Report reviewed successfully");
+      await processReport(selectedReport._id, payload);
+      setMessage("Report processed successfully");
       setSelectedReport(null);
       await loadReports();
     } catch (e) {
-      setError(e?.response?.data?.message || "Failed to review report");
-    }
-  };
-
-  const handleAssign = async () => {
-    if (!selectedReport?._id || !selectedTechnician) return;
-
-    try {
-      setMessage("");
-      setError("");
-      await assignTask(selectedReport._id, selectedTechnician);
-      setMessage("Task assigned successfully");
-      setSelectedReport(null);
-      await loadReports();
-    } catch (e) {
-      setError(e?.response?.data?.message || "Failed to assign report");
+      setError(e?.response?.data?.message || "Failed to process report");
     }
   };
 
@@ -246,7 +237,7 @@ const DispatcherDashboard = () => {
         <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-800">
             {activeTab === "reports" && "Pending Reports"}
-            {activeTab === "dispatch" && "Report Review & Assignment"}
+            {activeTab === "dispatch" && "Report Process & Assignment"}
             {activeTab === "delegate" && "Technician Delegation Mode"}
           </h2>
           <button
@@ -301,14 +292,30 @@ const DispatcherDashboard = () => {
             <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm text-slate-600 font-medium">
-                  Only reports with status <span className="font-bold">PENDING</span> are shown.
+                  All reports are visible. You can filter by status.
                 </p>
-                <button
-                  onClick={loadReports}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white text-sm font-bold px-4 py-2.5 hover:bg-indigo-700"
-                >
-                  <Search className="w-4 h-4" /> Reload Pending
-                </button>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={reportStatusFilter}
+                    onChange={(e) => setReportStatusFilter(e.target.value)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
+                  >
+                    <option value="">ALL</option>
+                    <option value="PENDING">PENDING</option>
+                    <option value="VALID">VALID</option>
+                    <option value="IN_PROGRESS">IN_PROGRESS</option>
+                    <option value="RESOLVED">RESOLVED</option>
+                    <option value="REJECTED">REJECTED</option>
+                    <option value="SPAM">SPAM</option>
+                    <option value="ARCHIVED">ARCHIVED</option>
+                  </select>
+                  <button
+                    onClick={loadReports}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white text-sm font-bold px-4 py-2.5 hover:bg-indigo-700"
+                  >
+                    <Search className="w-4 h-4" /> Reload
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-auto">
@@ -359,7 +366,7 @@ const DispatcherDashboard = () => {
                     {!reports.length && !loading && (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-500">
-                          No pending reports found.
+                          No reports found.
                         </td>
                       </tr>
                     )}
@@ -372,7 +379,7 @@ const DispatcherDashboard = () => {
           {activeTab === "dispatch" && (
             <section className="grid lg:grid-cols-2 gap-6">
               <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Triage Report</h3>
+                <h3 className="text-lg font-bold text-slate-900 mb-4">Process Report (Single Action)</h3>
                 {!selectedReport ? (
                   <p className="text-sm text-slate-500">Select a report from "District Reports".</p>
                 ) : (
@@ -411,23 +418,8 @@ const DispatcherDashboard = () => {
                         className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                       />
                     )}
-                    <button
-                      onClick={handleReview}
-                      className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white text-sm font-bold px-4 py-3 hover:bg-indigo-700"
-                    >
-                      <ClipboardCheck className="w-4 h-4" />
-                      Save Review
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-                <h3 className="text-lg font-bold text-slate-900 mb-4">Assign Technician</h3>
-                {!selectedReport ? (
-                  <p className="text-sm text-slate-500">Select a report first.</p>
-                ) : (
-                  <div className="space-y-4">
+                    <div className="pt-2 border-t border-slate-100">
+                      <h4 className="text-sm font-bold text-slate-800 mb-2">Assign Technician</h4>
                     <p className="text-sm text-slate-600">
                       Suggested technicians are ranked by workload then geo proximity.
                     </p>
@@ -443,13 +435,18 @@ const DispatcherDashboard = () => {
                         </option>
                       ))}
                     </select>
+                    </div>
                     <button
-                      onClick={handleAssign}
-                      disabled={!selectedTechnician}
+                      onClick={handleProcessReport}
+                      disabled={
+                        !selectedTechnician ||
+                        !reviewAction ||
+                        (reviewAction === "REJECT" && !rejectionReason.trim())
+                      }
                       className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 text-white text-sm font-bold px-4 py-3 hover:bg-black disabled:opacity-50"
                     >
-                      <Send className="w-4 h-4" />
-                      Assign Report
+                      <ClipboardCheck className="w-4 h-4" />
+                      Process Report
                     </button>
                   </div>
                 )}

@@ -23,6 +23,29 @@ export const getPendingReports = async (req, res, next) => {
   }
 };
 
+export const getAllReports = async (req, res, next) => {
+  try {
+    const { status, category, urgency } = req.query;
+    const filters = {};
+
+    if (status) filters.status = status;
+    if (category) filters.category = category;
+    if (urgency) filters.urgency = urgency;
+
+    const reports = await Report.find(filters)
+      .populate("citizen", "fullName phoneNumber nationalId")
+      .populate("assignedTechnician", "fullName phoneNumber employeeId")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      data: reports,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const reviewReport = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -269,6 +292,74 @@ export const assignTask = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Task assigned successfully",
+      data: report,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const processReport = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { action, technicianId, rejectionReason } = req.body;
+
+    if (!isValidObjectId(id) || !isValidObjectId(technicianId)) {
+      return res.status(400).json({
+        success: false,
+        message: "report id and technicianId are required and must be valid",
+      });
+    }
+
+    if (!["APPROVE", "REJECT"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "Action must be APPROVE or REJECT",
+      });
+    }
+
+    if (action === "REJECT" && !rejectionReason?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "rejectionReason is required when action is REJECT",
+      });
+    }
+
+    const [report, technician] = await Promise.all([
+      Report.findById(id),
+      User.findById(technicianId),
+    ]);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+
+    if (!technician || technician.role !== UserRoles.TECHNICIAN) {
+      return res.status(400).json({
+        success: false,
+        message: "Assigned user must be a technician",
+      });
+    }
+
+    report.assignedTechnician = technician._id;
+    report.districtManager = req.user.id;
+
+    if (action === "APPROVE") {
+      report.status = ReportStatus.IN_PROGRESS;
+      report.rejectionReason = undefined;
+    } else {
+      report.status = ReportStatus.REJECTED;
+      report.rejectionReason = rejectionReason.trim();
+    }
+
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Report processed successfully",
       data: report,
     });
   } catch (error) {

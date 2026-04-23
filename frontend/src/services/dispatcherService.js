@@ -1,7 +1,7 @@
 import api from "./api";
 
-export const getPendingReports = async () => {
-  const { data } = await api.get("/manager/reports/pending");
+export const getPendingReports = async (params = {}) => {
+  const { data } = await api.get("/manager/reports", { params });
   return data;
 };
 
@@ -22,6 +22,11 @@ export const getTechnicianSuggestions = async (reportId) => {
 
 export const assignTask = async (reportId, technicianId) => {
   const { data } = await api.patch(`/manager/reports/${reportId}/assign`, { technicianId });
+  return data;
+};
+
+export const processReport = async (reportId, payload) => {
+  const { data } = await api.patch(`/manager/reports/${reportId}/process`, payload);
   return data;
 };
 
