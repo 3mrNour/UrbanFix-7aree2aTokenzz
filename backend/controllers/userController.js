@@ -188,17 +188,18 @@ export const deleteUser = async (req, res, next) => {
       });
     }
 
-    user.isActive = !user.isActive;
-    user.deletedAt = user.isActive ? null : new Date();
-    await user.save();
+    const isActive = !user.isActive;
+    const deletedAt = isActive ? null : new Date();
+    
+    await User.findByIdAndUpdate(id, { isActive, deletedAt }, { runValidators: false });
 
     return res.status(200).json({
       success: true,
-      message: `User has been ${user.isActive ? "reactivated" : "deactivated"} successfully`,
+      message: `User has been ${isActive ? "reactivated" : "deactivated"} successfully`,
       data: {
         id: user._id,
-        isActive: user.isActive,
-        deletedAt: user.deletedAt,
+        isActive,
+        deletedAt,
       },
     });
   } catch (error) {
