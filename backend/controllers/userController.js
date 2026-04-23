@@ -1,6 +1,7 @@
 import { validationResult } from "express-validator";
 import User from "../models/User.js";
 import { UserRoles } from "../utils/enums.js";
+import generateToken from "../utils/generateToken.js";
 
 const sendValidationErrors = (req, res) => {
   const errors = validationResult(req);
@@ -197,6 +198,110 @@ export const deleteUser = async (req, res, next) => {
         isActive: user.isActive,
         deletedAt: user.deletedAt,
       },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const login = async (req, res, next) => {
+  try {
+    const { nationalId, employeeId, password } = req.body;
+
+    if ((!nationalId && !employeeId) || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide (nationalId or employeeId) and password",
+      });
+    }
+
+    const query = nationalId ? { nationalId } : { employeeId };
+    const user = await User.findOne(query).select("+password");
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    const isPasswordCorrect = await user.comparePassword(password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials",
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Account is inactive",
+      });
+    }
+
+    const token = generateToken(user._id);
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      token,
+      data: userResponse,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const loginAdmin = async (req, res, next) => {
+  try {
+    const { employeeId, password } = req.body;
+
+    if (!employeeId || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please provide employeeId and password",
+      });
+    }
+
+    const admin = await User.findOne({
+      employeeId,
+      role: { $in: [UserRoles.MANAGER, UserRoles.GOVERNOR] },
+    }).select("+password");
+
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid admin credentials",
+      });
+    }
+
+    const isPasswordCorrect = await admin.comparePassword(password);
+    if (!isPasswordCorrect) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid admin credentials",
+      });
+    }
+
+    if (!admin.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin account is inactive",
+      });
+    }
+
+    const token = generateToken(admin._id);
+    const userResponse = admin.toObject();
+    delete userResponse.password;
+
+    return res.status(200).json({
+      success: true,
+      message: "Admin login successful",
+      token,
+      data: userResponse,
     });
   } catch (error) {
     return next(error);

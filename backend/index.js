@@ -5,6 +5,9 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import userRoutes from "./routes/userRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
+import { ensureDefaultAdmin } from "./utils/seedAdmin.js";
 
 dotenv.config();
 
@@ -19,6 +22,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use("/api/users", userRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/tasks", taskRoutes);
 
 
 app.get("/health", (_req, res) => {
@@ -63,6 +68,7 @@ const connectDB = async () => {
 
 const startServer = async () => {
   await connectDB();
+  await ensureDefaultAdmin();
 
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {

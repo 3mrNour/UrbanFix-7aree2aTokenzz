@@ -5,45 +5,48 @@ import {
   getUserProfile,
   updateUser,
   deleteUser,
+  login,
+  loginAdmin,
 } from "../controllers/userController.js";
 import { createUserValidator, updateUserValidator } from "../validators/userValidator.js";
+import { protect, restrictTo } from "../middleware/authMiddleware.js";
 
 const router = Router();
 
-// TODO: Re-enable auth middlewares in next step.
+router.post("/login", login);
+router.post("/admin/login", loginAdmin);
+
 router.post(
   "/",
-  // protect,
-  // authorize("MANAGER", "GOVERNOR"),
   createUserValidator,
   createUser
 );
 
 router.get(
   "/",
-  // protect,
-  // authorize("MANAGER", "GOVERNOR"),
+  protect,
+  restrictTo("MANAGER", "GOVERNOR"),
   getAllUsers
 );
 
 router.get(
   "/profile",
-  // protect,
+  protect,
   getUserProfile
 );
 
 router.patch(
   "/:id",
-  // protect,
-  // authorize("MANAGER", "GOVERNOR"),
+  protect,
+  restrictTo("MANAGER", "GOVERNOR"),
   updateUserValidator,
   updateUser
 );
 
 router.delete(
   "/:id",
-  // protect,
-  // authorize("GOVERNOR"),
+  protect,
+  restrictTo("GOVERNOR"),
   deleteUser
 );
 
