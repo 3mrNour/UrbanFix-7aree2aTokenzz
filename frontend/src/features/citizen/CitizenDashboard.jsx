@@ -3,6 +3,16 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createReport, getMyReports } from "../../services/reportService";
+import { 
+  MapPin, 
+  LogOut, 
+  PlusCircle, 
+  AlertCircle, 
+  FileText, 
+  LayoutList, 
+  MapPinOff,
+  Image as ImageIcon
+} from "lucide-react";
 
 const reportSchema = z.object({
   category: z.string().min(1, "Category is required"),
@@ -13,6 +23,19 @@ const reportSchema = z.object({
     .refine((f) => f?.length === 1, "Photo is required"),
   addressDescription: z.string().optional(),
 });
+
+const getUrgencyStyles = (urgency) => {
+  switch (urgency) {
+    case "High":
+      return "bg-rose-50 text-rose-700 border-rose-200";
+    case "Medium":
+      return "bg-amber-50 text-amber-700 border-amber-200";
+    case "Low":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
+    default:
+      return "bg-slate-50 text-slate-700 border-slate-200";
+  }
+};
 
 const CitizenDashboard = () => {
   const [reports, setReports] = useState([]);
@@ -116,141 +139,240 @@ const CitizenDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
+    <div className="min-h-screen bg-slate-50/50 font-sans">
+      {/* Sleek Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold text-slate-900">Citizen Dashboard</h1>
-            <p className="text-sm text-slate-500">{user?.fullName || "Urban Fix Citizen"}</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-indigo-600 p-2 rounded-lg">
+              <LayoutList className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">Urban Fix</h1>
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">
+                {user?.fullName || "Citizen Dashboard"}
+              </p>
+            </div>
           </div>
           <button
             onClick={handleLogout}
-            className="px-3 py-2 rounded-md bg-slate-900 text-white text-sm hover:bg-slate-800"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium hover:bg-slate-200 hover:text-slate-900 transition-colors"
           >
-            Logout
+            <LogOut className="w-4 h-4" />
+            <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto p-4 grid lg:grid-cols-2 gap-6">
-        <section className="bg-white border border-slate-200 rounded-xl p-5">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">Create New Report</h2>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
-              <select
-                {...register("category")}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="Roads">Roads</option>
-                <option value="Electricity">Electricity</option>
-                <option value="Sanitation">Sanitation</option>
-                <option value="Pothole">Pothole</option>
-                <option value="Streetlight">Streetlight</option>
-                <option value="Leak">Leak</option>
-                <option value="Trash">Trash</option>
-                <option value="Sewage">Sewage</option>
-              </select>
-              {errors.category && (
-                <p className="mt-1 text-xs text-rose-600">{errors.category.message}</p>
-              )}
+      <main className="max-w-6xl mx-auto p-4 py-8 grid lg:grid-cols-12 gap-8">
+        
+        {/* Left Column: Form (Takes up 5 columns on large screens) */}
+        <section className="lg:col-span-5 flex flex-col gap-4">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <PlusCircle className="w-5 h-5 text-indigo-600" />
+              <h2 className="text-lg font-bold text-slate-900">Create New Report</h2>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-              <textarea
-                {...register("description")}
-                rows={4}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-              {errors.description && (
-                <p className="mt-1 text-xs text-rose-600">{errors.description.message}</p>
-              )}
-            </div>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
+                <select
+                  {...register("category")}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
+                >
+                  <option value="Roads">Roads</option>
+                  <option value="Electricity">Electricity</option>
+                  <option value="Sanitation">Sanitation</option>
+                  <option value="Pothole">Pothole</option>
+                  <option value="Streetlight">Streetlight</option>
+                  <option value="Leak">Leak</option>
+                  <option value="Trash">Trash</option>
+                  <option value="Sewage">Sewage</option>
+                </select>
+                {errors.category && (
+                  <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {errors.category.message}
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Urgency</label>
-              <select
-                {...register("urgency")}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              >
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Description</label>
+                <textarea
+                  {...register("description")}
+                  rows={4}
+                  placeholder="Describe the issue in detail..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all resize-none"
+                />
+                {errors.description && (
+                  <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {errors.description.message}
+                  </p>
+                )}
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Address</label>
-              <input
-                {...register("addressDescription")}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-              />
-            </div>
+              {/* Urgency */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Urgency</label>
+                <select
+                  {...register("urgency")}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Photo Before</label>
-              <input
-                type="file"
-                accept="image/*"
-                {...register("photoBefore")}
-                className="w-full text-sm"
-              />
-              {errors.photoBefore && (
-                <p className="mt-1 text-xs text-rose-600">{errors.photoBefore.message}</p>
-              )}
-            </div>
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Address / Landmark</label>
+                <div className="relative">
+                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                  <input
+                    {...register("addressDescription")}
+                    placeholder="E.g., Near the central park gate"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
 
-            <button
-              type="button"
-              onClick={getLocation}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-100"
-            >
-              Use My Current Location
-            </button>
+              {/* Photo Upload */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Photo Evidence</label>
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    {...register("photoBefore")}
+                    className="block w-full text-sm text-slate-500 border border-slate-200 rounded-xl bg-slate-50
+                      file:mr-4 file:py-2.5 file:px-4 file:border-0 file:text-sm file:font-semibold 
+                      file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200 transition-all cursor-pointer"
+                  />
+                  {errors.photoBefore && (
+                    <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {errors.photoBefore.message}
+                    </p>
+                  )}
+                </div>
+              </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full rounded-lg bg-slate-900 text-white px-3 py-2 text-sm hover:bg-slate-800 disabled:opacity-70"
-            >
-              {submitting ? "Submitting..." : "Submit Report"}
-            </button>
-          </form>
+              {/* Actions */}
+              <div className="pt-2 space-y-3">
+                <button
+                  type="button"
+                  onClick={getLocation}
+                  className={`w-full flex items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-all ${
+                    coordinates 
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-700" 
+                      : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  {coordinates ? <MapPin className="w-4 h-4" /> : <MapPinOff className="w-4 h-4" />}
+                  {coordinates ? "Location Captured ✓" : "Capture Current Location"}
+                </button>
 
-          {message && <p className="mt-3 text-sm text-emerald-700">{message}</p>}
-          {error && <p className="mt-3 text-sm text-rose-700">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 text-white px-4 py-3 text-sm font-semibold hover:bg-indigo-700 shadow-sm hover:shadow active:scale-[0.98] transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {submitting ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Submitting...
+                    </span>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4" /> Submit Report
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* Notifications */}
+            {message && (
+              <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-100 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-emerald-600 mt-0.5" />
+                <p className="text-sm text-emerald-700 font-medium">{message}</p>
+              </div>
+            )}
+            {error && (
+              <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-100 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-rose-600 mt-0.5" />
+                <p className="text-sm text-rose-700 font-medium">{error}</p>
+              </div>
+            )}
+          </div>
         </section>
 
-        <section className="bg-white border border-slate-200 rounded-xl p-5">
-          <h2 className="text-lg font-semibold text-slate-900 mb-4">My Reports</h2>
-          {loadingReports ? (
-            <p className="text-sm text-slate-500">Loading reports...</p>
-          ) : reports.length === 0 ? (
-            <p className="text-sm text-slate-500">No reports yet.</p>
-          ) : (
-            <div className="space-y-3 max-h-[70vh] overflow-auto pr-1">
-              {reports.map((report) => (
-                <article
-                  key={report._id}
-                  className="rounded-lg border border-slate-200 p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium text-slate-900">{report.category}</p>
-                    <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">
-                      {report.status}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-600 mt-1">{report.description}</p>
-                  <p className="text-xs text-slate-500 mt-2">
-                    Urgency: {report.urgency} | Created:{" "}
-                    {new Date(report.createdAt).toLocaleString()}
-                  </p>
-                </article>
-              ))}
+        {/* Right Column: Reports List (Takes up 7 columns on large screens) */}
+        <section className="lg:col-span-7">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6 h-full flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <LayoutList className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-lg font-bold text-slate-900">My Reports</h2>
+              </div>
+              <span className="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">
+                {reports.length} Total
+              </span>
             </div>
-          )}
+
+            {loadingReports ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3 py-12">
+                <div className="w-8 h-8 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin" />
+                <p className="text-sm font-medium">Loading your reports...</p>
+              </div>
+            ) : reports.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 space-y-3 py-16 border-2 border-dashed border-slate-100 rounded-xl">
+                <FileText className="w-12 h-12 text-slate-300" />
+                <p className="text-sm font-medium text-slate-500">You haven't submitted any reports yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar pb-2" style={{ maxHeight: 'calc(100vh - 200px)' }}>
+                {reports.map((report) => (
+                  <article
+                    key={report._id}
+                    className="group relative rounded-xl border border-slate-200 p-5 hover:border-indigo-200 hover:shadow-md bg-white transition-all"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-slate-50 p-2 rounded-lg border border-slate-100 group-hover:bg-indigo-50 group-hover:border-indigo-100 transition-colors">
+                          <ImageIcon className="w-5 h-5 text-slate-500 group-hover:text-indigo-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900">{report.category}</h3>
+                          <p className="text-xs font-medium text-slate-500 mt-0.5">
+                            {new Date(report.createdAt).toLocaleDateString(undefined, { 
+                              year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' 
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          {report.status || "Pending"}
+                        </span>
+                        <span className={`text-[10px] uppercase tracking-wider px-2 py-0.5 rounded border font-bold ${getUrgencyStyles(report.urgency)}`}>
+                          {report.urgency}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="pl-12">
+                      <p className="text-sm text-slate-600 leading-relaxed line-clamp-2">
+                        {report.description}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </main>
     </div>
