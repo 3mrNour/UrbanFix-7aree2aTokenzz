@@ -1,12 +1,16 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const cors = require("cors");
-const dotenv = require("dotenv");
-const path = require("path");
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import userRoutes from "./routes/userRoutes.js";
 
 dotenv.config();
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
@@ -14,6 +18,7 @@ app.use(express.urlencoded({ extended: true }));
 
 
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/api/users", userRoutes);
 
 
 app.get("/health", (_req, res) => {
